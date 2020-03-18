@@ -10,7 +10,6 @@ pandas = "*"
 chromedriver-binary = "==80.*"
 python-decouple = "*"
 retry = "*"
-phl-courts-scraper = {path = "."}
 
 [dev-packages]
 pre-commit = "*"

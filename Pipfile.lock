@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "3a84023922b74b5405eba714569682c0165334ea4da1e91c6696d221bf09626b"
+            "sha256": "40b1789681d3f48a540ef32fcd019912632cf317e546b5e2efef16213d44155b"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -78,9 +78,6 @@
             ],
             "index": "pypi",
             "version": "==1.0.3"
-        },
-        "phl-courts-scraper": {
-            "path": "."
         },
         "py": {
             "hashes": [
@@ -384,6 +381,7 @@
             "version": "==0.7.0"
         },
         "phl-courts-scraper": {
+            "editable": true,
             "path": "."
         },
         "pluggy": {
