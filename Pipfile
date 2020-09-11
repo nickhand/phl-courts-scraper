@@ -7,7 +7,7 @@ name = "pypi"
 selenium = "*"
 numpy = "*"
 pandas = "*"
-chromedriver-binary = "==80.*"
+chromedriver-binary = "==84.*"
 python-decouple = "*"
 retry = "*"
 
@@ -20,7 +20,7 @@ pytest-cov = "*"
 black = "==19.10b0"
 flake8-mypy = "*"
 coverage = "*"
-phl-courts-scraper = {editable = true,path = "."}
+phl-courts-scraper = {editable = true, path = "."}
 
 [requires]
 python_version = "3.7"

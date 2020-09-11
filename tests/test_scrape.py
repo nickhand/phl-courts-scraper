@@ -1,36 +1,34 @@
+import chromedriver_binary
 import pytest
 from selenium import webdriver
-import chromedriver_binary
 
-from phl_courts_scraper.scrape import (
-    initialize_incident_scrape,
-    scrape_data_by_incident,
-)
+from phl_courts_scraper.scrape import IncidentNumberScraper
 
 
 @pytest.fixture
-def driver():
+def scraper():
+    """Return a `IncidentNumberScraper` to use in multiple tests."""
 
+    # Initialize the driver
     options = webdriver.ChromeOptions()
     options.add_argument("--headless")
-    return webdriver.Chrome(options=options)
+    driver = webdriver.Chrome(options=options)
+
+    # Return the scraper
+    return IncidentNumberScraper(driver)
 
 
-def test_scrape_successful(driver):
-
-    # initialize the scrape
-    initialize_incident_scrape(driver)
+def test_scrape_successful(scraper):
+    """Test scraping for a successful DC number."""
 
     # scrape
-    data = scrape_data_by_incident(driver, "1725088232")
+    data = scraper.scrape("1725088232")
     assert len(data) == 2
 
 
-def test_scrape_failure(driver):
+def test_scrape_failure(scraper):
+    """Test scraping failure."""
 
-    # initialize the scrape
-    initialize_incident_scrape(driver)
-
-    # scrape
-    data = scrape_data_by_incident(driver, "17")
+    # Fail with bad dc number
+    data = scraper.scrape("17")
     assert data is None
