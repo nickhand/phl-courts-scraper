@@ -1,6 +1,7 @@
-from setuptools import setup, find_packages
 import re
 from pathlib import Path
+
+from setuptools import find_packages, setup
 
 PACKAGE_NAME = "phl_courts_scraper"
 HERE = Path(__file__).parent.absolute()
@@ -31,6 +32,8 @@ setup(
         "numpy",
         "pandas",
         "selenium",
-        "chromedriver_binary==80.*",
+        "webdriver_manager",
+        "intervaltree",
+        "pdfplumber",
     ],
 )
