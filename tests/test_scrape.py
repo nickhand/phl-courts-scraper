@@ -1,8 +1,7 @@
-import chromedriver_binary
 import pytest
-from selenium import webdriver
-
 from phl_courts_scraper.scrape import IncidentNumberScraper
+from selenium import webdriver
+from webdriver_manager.chrome import ChromeDriverManager
 
 
 @pytest.fixture
@@ -12,7 +11,7 @@ def scraper():
     # Initialize the driver
     options = webdriver.ChromeOptions()
     options.add_argument("--headless")
-    driver = webdriver.Chrome(options=options)
+    driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
 
     # Return the scraper
     return IncidentNumberScraper(driver)

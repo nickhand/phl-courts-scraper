@@ -7,9 +7,11 @@ name = "pypi"
 selenium = "*"
 numpy = "*"
 pandas = "*"
-chromedriver-binary = "==84.*"
 python-decouple = "*"
 retry = "*"
+pdfplumber = "*"
+intervaltree = "*"
+webdriver-manager = "*"
 
 [dev-packages]
 pre-commit = "*"
@@ -21,6 +23,9 @@ black = "==19.10b0"
 flake8-mypy = "*"
 coverage = "*"
 phl-courts-scraper = {editable = true, path = "."}
+jupyterlab = "*"
+notebook = "*"
+ipython = "*"
 
 [requires]
 python_version = "3.7"
