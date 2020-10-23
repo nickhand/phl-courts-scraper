@@ -59,9 +59,14 @@ def _parse_raw_docket(words: List[Word]) -> Tuple[str, dict]:
 
     # Split into docket header and body
     docket_header, docket_body = _parse_docket_header(words)
-    docket_number = docket_header[0].text
+
+    # First two lines are the county and docket number
+    county = docket_header[0].text
+    docket_number = docket_header[1].text
+
+    # Format the rest
     header_info = dict(
-        [[s.strip() for s in w.text.split(":")] for w in docket_header[1:]]
+        [[s.strip() for s in w.text.split(":")] for w in docket_header[2:]]
     )
 
     # Parse the docket body
@@ -149,6 +154,7 @@ def _parse_raw_docket(words: List[Word]) -> Tuple[str, dict]:
 
     # Format the string keys in header
     header_info = format_dict_keys(header_info)
+    header_info["county"] = county
 
     # Format the string keys in results
     results = [format_dict_keys(r) for r in results]
@@ -281,7 +287,7 @@ def _find_line_numbers(
     return indexPosList
 
 
-def _yield_dockets(words: List[Word], kind: str) -> List[Word]:
+def _yield_dockets(dockets: List[Word]) -> List[Word]:
     """
     Yield words associated with all of the dockets
     of a specific kind, either "Active" or "Closed".
@@ -298,19 +304,6 @@ def _yield_dockets(words: List[Word], kind: str) -> List[Word]:
     docket :
         the words for each docket
     """
-    # Get start/stop for Active dockets
-    if kind == "Active":
-        start = _find_line_numbers(words, "Active")
-        stop = _find_line_numbers(words, "Closed", how="contains")
-
-    # Get start/stop for Active dockets
-    else:
-        start = _find_line_numbers(words, "Closed", how="contains")
-        stop = None
-
-    # Trim input words to just this kind
-    dockets = words[start:stop]
-
     # Delete any headers
     header_size = 5
     for pg in reversed(
@@ -332,7 +325,7 @@ def _yield_dockets(words: List[Word], kind: str) -> List[Word]:
 
     # Find the indices of the docket numbers
     indices = [
-        _find_line_numbers(dockets, docket_number)
+        _find_line_numbers(dockets, docket_number) - 1
         for docket_number in docket_numbers
     ] + [None]
 
@@ -356,64 +349,87 @@ class CourtSummary:
         # Parse PDF
         self.words = get_pdf_words(self.path)
 
-    @property
-    def has_active_dockets(self):
-        """Any active dockets?"""
-        return _find_line_numbers(self.words, "Active", missing="ignore") != []
+        # Determine section headers
+        starts = {}
+        for hdr in ["Active", "Closed", "Inactive", "Archived"]:
+            line = _find_line_numbers(self.words, hdr, missing="ignore")
+            if line != []:
+                starts[hdr] = line
+
+        # Put it in the correct order (ascending)
+        sections = sorted(starts, key=itemgetter(1))
+        sorted_starts = collections.OrderedDict()
+        for key in sections:
+            sorted_starts[key] = starts[key]
+
+        # Parse the dockets
+        self.dockets = collections.OrderedDict()
+        for i, this_section in enumerate(sorted_starts):
+
+            # Skip the "Archived" section
+            if this_section == "Archived":
+                continue
+
+            # Determine the next section if there is one
+            next_section = sections[i + 1] if i < len(sections) - 1 else None
+
+            # Determine line number of sections
+            this_section_start = sorted_starts[this_section]
+            next_section_start = (
+                sorted_starts[next_section] if next_section else None
+            )
+
+            # Trim the words to just lines in this section
+            words_this_section = self.words[
+                this_section_start:next_section_start
+            ]
+
+            dockets = {}
+            for docket in _yield_dockets(words_this_section):
+                docket_number, info = _parse_raw_docket(docket)
+                dockets[docket_number] = info
+
+            self.dockets[this_section] = dockets
 
     @property
-    def has_closed_dockets(self):
-        """Any closed dockets?"""
-        return _find_line_numbers(self.words, "Closed", missing="ignore") != []
+    def sections(self):
+        """Sections in the court summary report."""
+        return list(self.dockets)
 
     @property
     def header(self) -> dict:
         """The header of the court summary."""
-        return _parse_header(
-            self.words, "Active" if self.has_active_dockets else "Closed"
-        )
+        return _parse_header(self.words, self.sections[0])
 
     @property
     def active_dockets(self) -> dict:
         """The active dockets."""
-
-        if not self.has_active_dockets:
-            return {}
-
-        dockets = {}
-        for docket in _yield_dockets(self.words, "Active"):
-            docket_number, info = _parse_raw_docket(docket)
-            dockets[docket_number] = info
-
-        return dockets
+        return self.dockets.get("Active", {})
 
     @property
     def closed_dockets(self) -> dict:
         """The closed dockets."""
+        return self.dockets.get("Closed", {})
 
-        if not self.has_closed_dockets:
-            return {}
+    @property
+    def inactive_dockets(self) -> dict:
+        """The inactive dockets."""
+        return self.dockets.get("Inactive", {})
 
-        dockets = {}
-        for docket in _yield_dockets(self.words, "Closed"):
-            docket_number, info = _parse_raw_docket(docket)
-            dockets[docket_number] = info
-
-        return dockets
-
-    def asdict(self):
+    def asdict(self, slim: bool = False):
         """Convert the class to a dictionary."""
 
         out = {}
-        for key in ["path", "header", "active_dockets", "closed_dockets"]:
+        for key in ["path", "header", "dockets"]:
             out[key] = getattr(self, key)
 
-        out["words"] = [word.__dict__ for word in self.words]
+        if not slim:
+            out["words"] = [word.__dict__ for word in self.words]
 
         return out
 
     def to_json(
-        self, path: Optional[Union[Path, str]] = None
+        self, path: Optional[Union[Path, str]] = None, slim: bool = False
     ) -> Optional[str]:
         """Convert to json representation."""
 
@@ -422,10 +438,10 @@ class CourtSummary:
                 path = Path(path)
 
             with path.open("w") as fp:
-                json.dump(self.asdict(), fp)
+                json.dump(self.asdict(slim=slim), fp)
 
         else:
-            return json.dumps(self.asdict())
+            return json.dumps(self.asdict(slim=slim))
 
     @classmethod
     def from_json(cls, path: Union[Path, str]) -> CourtSummary:
@@ -446,13 +462,16 @@ class CourtSummary:
             d = json.load(path.open("r"))
 
         # Convert words to objects
-        d["words"] = [Word(**word) for word in d["words"]]
+        if "words" in d:
+            d["words"] = [Word(**word) for word in d["words"]]
+        else:
+            d["words"] = None
 
         # Initialize
         out = cls(path=d.pop("path"))
 
         # Add other attributes
-        for key in ["words", "header", "active_dockets", "closed_dockets"]:
+        for key in ["words", "header", "dockets"]:
             out.__dict__[key] = d[key]
 
         return out
