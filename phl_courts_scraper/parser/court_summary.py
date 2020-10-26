@@ -5,7 +5,7 @@ import json
 from dataclasses import dataclass
 from operator import attrgetter, itemgetter
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
+from typing import ClassVar, List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -15,7 +15,24 @@ from .utils import find_nearest, format_dict_keys, group_into_lines, groupby
 __all__ = ["CourtSummary"]
 
 
-def _parse_raw_docket(words: List[Word]) -> Tuple[str, dict]:
+def _vertically_aligned(x0, x1, tol=3):
+    return abs(x0 - x1) <= tol
+
+
+def _get_line_as_dict(header, line):
+
+    r = {}
+    header_values = [w.text for w in header]
+    for iline in range(len(line)):
+        w = line[iline]
+        nearest = find_nearest([h.x for h in header], w.x)
+        r[header_values[nearest]] = w.text
+    return r
+
+
+def _parse_raw_docket(
+    docket_number: str, words: List[Word]
+) -> Tuple[str, dict]:
     """Parse the raw docket words.
 
     Returns
@@ -49,25 +66,40 @@ def _parse_raw_docket(words: List[Word]) -> Tuple[str, dict]:
     header_lines = list(H.values())
 
     # Determine unique ones and multiheader status
-    unique_header_lines = []
-    for elem in header_lines:
-        if elem not in unique_header_lines:
-            unique_header_lines.append(elem)
+    header_values = []
+    keep = []
+    for i, elem in enumerate(header_lines):
+        texts = [w.text for w in elem]
+        if texts not in header_values:
+            header_values.append(texts)
+            keep.append(i)
 
-    unique_header_nrows = len(unique_header_lines)
+    header_lines = [line for (i, line) in enumerate(header_lines) if i in keep]
+
+    unique_header_nrows = len(header_lines)
     multiline_header = unique_header_nrows > 1
+    if multiline_header:
+        assert unique_header_nrows == 2
 
     # Split into docket header and body
-    docket_header, docket_body = _parse_docket_header(words)
-
-    # First two lines are the county and docket number
-    county = docket_header[0].text
-    docket_number = docket_header[1].text
+    docket_header, docket_body = _parse_docket_header(docket_number, words)
 
     # Format the rest
-    header_info = dict(
-        [[s.strip() for s in w.text.split(":")] for w in docket_header[2:]]
-    )
+    header_info = [
+        [s.strip() for s in w.text.split(":")] for w in docket_header[1:]
+    ]
+
+    # IMPORTANT: ensure that ":" split gave us two fields
+    extra = []
+    for i in reversed(range(0, len(header_info))):
+        value = header_info[i]
+        if len(value) != 2:
+            value = header_info.pop(i)
+            if value[0] != docket_number:
+                extra.append(value)
+
+    # Convert to dict
+    header_info = dict(header_info)
 
     # Parse the docket body
     results = []
@@ -78,90 +110,71 @@ def _parse_raw_docket(words: List[Word]) -> Tuple[str, dict]:
         lines_y = sorted(lines)  # the y-values (keys of lines)
 
         # Determine indents of rows
-        indents = collections.OrderedDict()
-        for y in lines_y:
+        row = None
+        for i, y in enumerate(lines_y):
+
+            # This is the line
+            line = lines[y]
+            start = line[0].x  # First x value in line
 
             # If this line is a header line, skip it!
-            if lines[y] in header_lines:
+            if [w.text for w in line] in header_values:
                 continue
 
-            # First x value in line
-            start = lines[y][0].x
+            # Skip if first line is docket number
+            # This skips any extra header lines continued on multiple pages
+            if line[0].text == docket_number:
+                continue
 
-            # indented?
-            if abs(start - lines[lines_y[0]][0].x) < 5:
-                indented = False
-            elif multiline_header and abs(start - lines[lines_y[1]][0].x) < 5:
-                indented = True
-            else:
-                indented = None
+            # Start of new charge
+            if line[0].text.isdigit():
 
-            if indented is not None:
-                indents[y] = indented
-            else:
-                if len(indents):
-                    lines[list(indents)[-1]] += lines.pop(y)
-                else:
-                    raise ValueError("This should never happen!")
-
-        # Combine rows that span multiple lines
-        for y in lines:
-            line = lines[y]
-            c = collections.Counter([w.x for w in line])
-            c = collections.Counter(el for el in c.elements() if c[el] > 1)
-            if len(c):
-                x0 = list(c.elements())[0]
-                to_merge = sorted(
-                    [w for w in line if w.x == x0], key=attrgetter("y"),
-                )
-                t = " ".join([w.text for w in to_merge])
-                new_word = Word(to_merge[0].x, to_merge[0].y, t)
-                new_line = [w for w in line if w.x != x0] + [new_word]
-                lines[y] = new_line
-
-        # Finally parse together lines into a dict
-        row = None
-        for i, y in enumerate(indents):
-            indented = indents[y]
-            if not indented:
                 if row is not None:
                     results.append(row)
-                row = {}
-                row["Sentences"] = []
-                header = unique_header_lines[0]
+
+                # Header and line as dict
+                header = header_lines[0]
+                line_dict = _get_line_as_dict(header, line)
+
+                row = line_dict.copy()
+                row["sentences"] = []
+
             else:
-                header = unique_header_lines[1]
+                if multiline_header and _vertically_aligned(
+                    start, header_lines[1][0].x, tol=1
+                ):
+                    # Header and line as dict
+                    header = header_lines[1]
+                    line_dict = _get_line_as_dict(header, line)
 
-            header_x0 = [w.x for w in header]
-            header_values = [w.text for w in header]
-            line = lines[y]
+                    row["sentences"].append(line_dict)
+                else:
 
-            if indented:
-                r = {}
-            else:
-                r = row
+                    line_dict = _get_line_as_dict(header, line)
 
-            for iline in range(len(line)):
-                w = line[iline]
-                nearest = find_nearest(header_x0, w.x)
-                r[header_values[nearest]] = w.text
+                    for key in line_dict:
+                        if key in row:
+                            row[key] += " " + line_dict[key]
+                        elif key in row["sentences"]:
+                            row["sentences"][key] += " " + line_dict[key]
+                        else:
+                            raise ValueError(
+                                "Error parsing docket lines — this should never happen!"
+                            )
 
-            if indented:
-                row["Sentences"].append(r)
-
-            if i == len(indents) - 1:
+            if i == len(lines_y) - 1:
                 results.append(row)
 
     # Format the string keys in header
     header_info = format_dict_keys(header_info)
-    header_info["county"] = county
+    header_info["extra"] = extra
 
     # Format the string keys in results
     results = [format_dict_keys(r) for r in results]
     for r in results:
         r["sentences"] = [format_dict_keys(d) for d in r["sentences"]]
 
-    return docket_number, {"header": header_info, "charges": results}
+    return {"header": header_info, "charges": results}
 
 
 def _parse_header(words: List[Word], firstSectionTitle: str) -> dict:
@@ -195,7 +208,9 @@ def _parse_header(words: List[Word], firstSectionTitle: str) -> dict:
     return out
 
 
-def _parse_docket_header(words: List[Word]) -> Tuple[List[Word], List[Word]]:
+def _parse_docket_header(
+    docket_number: str, words: List[Word]
+) -> Tuple[List[Word], List[Word]]:
     """Parse the header of a particular docket.
 
     Parameters
@@ -211,12 +226,16 @@ def _parse_docket_header(words: List[Word]) -> Tuple[List[Word], List[Word]]:
         the body of the docket; this is optional
     """
 
+    # Group into common y values
     grouped = [list(group) for _, group in groupby(words, "y")]
     grouped = [item for sublist in grouped for item in sublist]
+
     i = _find_line_numbers(grouped, "Seq No", missing="ignore")
+
+    # If this is missing: docket continues on multiple pages
     if i == []:
         return grouped, []
-    else:
+    else:  # split into header/body -- docket is on one page
         return grouped[:i], grouped[i:]
 
 
@@ -316,22 +335,38 @@ def _yield_dockets(dockets: List[Word]) -> List[Word]:
     ):
         del dockets[pg : pg + header_size]
 
-    # Find the docket numbers
-    docket_numbers = [
-        w.text
-        for w in dockets
-        if w.text.startswith("MC") or w.text.startswith("CP")
+    # Get docket numbers
+    docket_info = [
+        (i, w.text)
+        for i, w in enumerate(dockets)
+        if w.text.startswith("MC-") or w.text.startswith("CP-")
     ]
 
-    # Find the indices of the docket numbers
-    indices = [
-        _find_line_numbers(dockets, docket_number) - 1
-        for docket_number in docket_numbers
-    ] + [None]
+    indices, docket_numbers = list(zip(*docket_info))
+
+    indices = list(indices) + [None]
 
     # Yield the parts for each docket
+    returned = []
     for i in range(len(indices) - 1):
-        yield dockets[indices[i] : indices[i + 1]]
+
+        # This docket number
+        this_docket_num = docket_numbers[i]
+
+        # Skip dockets we've alreay returned
+        if this_docket_num in returned:
+            continue
+
+        # Determine the index of when the next one starts
+        j = i + 1
+        while j < len(docket_numbers) and this_docket_num == docket_numbers[j]:
+            j += 1
+
+        # Return
+        yield this_docket_num, dockets[indices[i] : indices[j]]
+
+        # Track which ones we've returned
+        returned.append(this_docket_num)
 
 
 @dataclass
@@ -339,6 +374,13 @@ class CourtSummary:
     """Parser for Court Summary Reports."""
 
     path: Union[str, Path]
+    SECTION_HEADERS: ClassVar[List[str]] = [
+        "Active",
+        "Closed",
+        "Inactive",
+        "Archived",
+        "Adjudicated",
+    ]
 
     def __post_init__(self):
         """Parse and save the input PDF."""
@@ -351,7 +393,7 @@ class CourtSummary:
 
         # Determine section headers
         starts = {}
-        for hdr in ["Active", "Closed", "Inactive", "Archived"]:
+        for hdr in self.SECTION_HEADERS:
             line = _find_line_numbers(self.words, hdr, missing="ignore")
             if line != []:
                 starts[hdr] = line
@@ -385,11 +427,23 @@ class CourtSummary:
             ]
 
             dockets = {}
-            for docket in _yield_dockets(words_this_section):
-                docket_number, info = _parse_raw_docket(docket)
-                dockets[docket_number] = info
+            for docket_number, docket in _yield_dockets(words_this_section):
+
+                # Do the parsing work
+                info = _parse_raw_docket(docket_number, docket)
+
+                if docket_number not in dockets:
+                    dockets[docket_number] = info
+                else:
+                    dockets[docket_number]["header"].update(info["header"])
+                    dockets[docket_number]["charges"] += info["charges"]
 
             self.dockets[this_section] = dockets
+
+    def __getitem__(self, key):
+        if key not in self.sections:
+            raise KeyError(f"No such section '{key}'")
+        return self.dockets[key]
 
     @property
     def sections(self):
@@ -400,21 +454,6 @@ class CourtSummary:
     def header(self) -> dict:
         """The header of the court summary."""
         return _parse_header(self.words, self.sections[0])
-
-    @property
-    def active_dockets(self) -> dict:
-        """The active dockets."""
-        return self.dockets.get("Active", {})
-
-    @property
-    def closed_dockets(self) -> dict:
-        """The closed dockets."""
-        return self.dockets.get("Closed", {})
-
-    @property
-    def inactive_dockets(self) -> dict:
-        """The inactive dockets."""
-        return self.dockets.get("Inactive", {})
 
     def asdict(self, slim: bool = False):
         """Convert the class to a dictionary."""
