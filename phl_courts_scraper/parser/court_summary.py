@@ -14,6 +14,76 @@ from .utils import find_nearest, format_dict_keys, group_into_lines, groupby
 
 __all__ = ["CourtSummary"]
 
+COUNTIES = [
+    "Clarion",
+    "Blair",
+    "Elk",
+    "Cumberland",
+    "Greene",
+    "Westmoreland",
+    "Mercer",
+    "Butler",
+    "Washington",
+    "Beaver",
+    "Snyder",
+    "Perry",
+    "Tioga",
+    "Berks",
+    "Bucks",
+    "Lawrence",
+    "Lehigh",
+    "Bradford",
+    "Allegheny",
+    "Susquehanna",
+    "Monroe",
+    "Wyoming",
+    "Wayne",
+    "Lackawanna",
+    "Clinton",
+    "Bedford",
+    "Erie",
+    "Centre",
+    "Jefferson",
+    "Cambria",
+    "Delaware",
+    "Franklin",
+    "Indiana",
+    "Chester",
+    "Lycoming",
+    "Potter",
+    "Forest",
+    "Clearfield",
+    "Crawford",
+    "Huntingdon",
+    "Mifflin",
+    "Lancaster",
+    "Sullivan",
+    "York",
+    "Schuylkill",
+    "Montgomery",
+    "Lebanon",
+    "Northumberland",
+    "McKean",
+    "Venango",
+    "Fulton",
+    "Montour",
+    "Adams",
+    "Armstrong",
+    "Carbon",
+    "Columbia",
+    "Dauphin",
+    "Fayette",
+    "Luzerne",
+    "Somerset",
+    "Cameron",
+    "Northampton",
+    "Juniata",
+    "Pike",
+    "Union",
+    "Warren",
+    "Philadelphia",
+]
+
 
 def _vertically_aligned(x0, x1, tol=3):
     return abs(x0 - x1) <= tol
@@ -357,12 +427,17 @@ def _yield_dockets(dockets: List[Word]) -> List[Word]:
         prev_word = dockets[indices[i] - 1]
         first_word = dockets[indices[i]]
 
-        if _vertically_aligned(
-            prev_word.x, first_word.x, tol=0.5
-        ) and _horizontally_aligned(prev_word.y, first_word.y, tol=15):
+        # Vertically aligned
+        # Prev line is county
+        if (
+            _vertically_aligned(prev_word.x, first_word.x, tol=0.5)
+            and prev_word.text.strip() in COUNTIES
+        ):
             counties.append(prev_word.text)
             indices[i] = indices[i] - 1
         else:
+            if not len(counties):
+                raise ValueError("Cannot determine county information")
             counties.append(counties[-1])
 
     # Yield the parts for each docket
