@@ -436,8 +436,6 @@ def _yield_dockets(dockets: List[Word]) -> List[Word]:
         prev_word = dockets[indices[i] - 1]
         first_word = dockets[indices[i]]
 
-        print(prev_word, first_word)
-
         # Vertically aligned
         # Prev line is county
         if (
