@@ -19,6 +19,10 @@ def _vertically_aligned(x0, x1, tol=3):
     return abs(x0 - x1) <= tol
 
 
+def _horizontally_aligned(y0, y1, tol=3):
+    return abs(y0 - y1) <= tol
+
+
 def _get_line_as_dict(header, line):
 
     r = {}
@@ -345,6 +349,21 @@ def _yield_dockets(dockets: List[Word]) -> List[Word]:
     indices, docket_numbers = list(zip(*docket_info))
 
     indices = list(indices) + [None]
+    counties = []
+
+    for i in range(len(indices) - 1):
+
+        #
+        prev_word = dockets[indices[i] - 1]
+        first_word = dockets[indices[i]]
+
+        if _vertically_aligned(
+            prev_word.x, first_word.x, tol=0.5
+        ) and _horizontally_aligned(prev_word.y, first_word.y, tol=15):
+            counties.append(prev_word.text)
+            indices[i] = indices[i] - 1
+        else:
+            counties.append(counties[-1])
 
     # Yield the parts for each docket
     returned = []
@@ -362,8 +381,11 @@ def _yield_dockets(dockets: List[Word]) -> List[Word]:
         while j < len(docket_numbers) and this_docket_num == docket_numbers[j]:
             j += 1
 
+        start = indices[i]
+        stop = indices[j]
+
         # Return
-        yield this_docket_num, dockets[indices[i] : indices[j]]
+        yield this_docket_num, counties[i], dockets[start:stop]
 
         # Track which ones we've returned
         returned.append(this_docket_num)
@@ -427,10 +449,15 @@ class CourtSummary:
             ]
 
             dockets = {}
-            for docket_number, docket in _yield_dockets(words_this_section):
+            for docket_number, county, docket in _yield_dockets(
+                words_this_section
+            ):
 
                 # Do the parsing work
                 info = _parse_raw_docket(docket_number, docket)
+
+                # Store the county
+                info["header"]["county"] = county
 
                 if docket_number not in dockets:
                     dockets[docket_number] = info
