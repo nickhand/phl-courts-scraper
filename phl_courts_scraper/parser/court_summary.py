@@ -398,7 +398,7 @@ def _yield_dockets(dockets: List[Word]) -> List[Word]:
         the words for each docket
     """
     # Delete any headers
-    header_size = 5
+    max_header_size = 5
     for pg in reversed(
         _find_line_numbers(
             dockets,
@@ -407,7 +407,16 @@ def _yield_dockets(dockets: List[Word]) -> List[Word]:
             missing="ignore",
         )
     ):
-        del dockets[pg : pg + header_size]
+        # Loop over header row
+        # REMOVE: any "Continued" lines of FJD / Court Summary header
+        for i in reversed(range(0, max_header_size)):
+            w = dockets[pg + i]
+            if (
+                w.text
+                in ["First Judicial District of Pennsylvania", "Court Summary"]
+                or "Continued" in w.text
+            ):
+                del dockets[pg + i]
 
     # Get docket numbers
     docket_info = [
@@ -426,6 +435,8 @@ def _yield_dockets(dockets: List[Word]) -> List[Word]:
         #
         prev_word = dockets[indices[i] - 1]
         first_word = dockets[indices[i]]
+
+        print(prev_word, first_word)
 
         # Vertically aligned
         # Prev line is county
