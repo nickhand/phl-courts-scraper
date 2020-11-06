@@ -12,7 +12,7 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
 
-from .schema import PortalSummary
+from .schema import PortalResults
 
 __all__ = ["UJSPortalScraper"]
 
@@ -72,7 +72,7 @@ class UJSPortalScraper:
             "Police Incident/Complaint Number"
         )
 
-    def __call__(self, dc_number: str) -> Optional[List[PortalSummary]]:
+    def __call__(self, dc_number: str) -> Optional[PortalResults]:
         """
         Given an input DC number for a police incident, return
         the relevant details from the courts portal.
@@ -85,7 +85,7 @@ class UJSPortalScraper:
         Returns
         -------
         results
-            a list of PortalSummary objects holding details for each unique
+            A PortalResults holding details for each unique
             docket number
         """
 
@@ -165,7 +165,10 @@ class UJSPortalScraper:
                 ]
                 X["court_summary_url"] = urls[-1]
                 X["docket_sheet_url"] = urls[-2]
-                out.append(PortalSummary.from_dict(X))
+                out.append(X)
+
+            # Return a Portal Results
+            out = PortalResults.from_dict({"data": out})
         except NoSuchElementException:
             pass
 

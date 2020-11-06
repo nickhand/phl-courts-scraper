@@ -76,7 +76,7 @@ class Charge(DataclassBase):
     disposition: Optional[str]
     sentences: Optional[List[Sentence]]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Sentence]:
         """Iterate through the sentences."""
         return iter(self.sentences)
 
@@ -206,7 +206,7 @@ class Docket(DataclassBase):
         """Index the charges."""
         return self.charges.__getitem__(index)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Charge]:
         """Iterate through the charges."""
         return iter(self.charges)
 

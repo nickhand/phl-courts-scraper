@@ -1,5 +1,9 @@
 import pytest
-from phl_courts_scraper.portal import PortalSummary, UJSPortalScraper
+from phl_courts_scraper.portal import (
+    PortalResult,
+    PortalResults,
+    UJSPortalScraper,
+)
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 
@@ -23,8 +27,9 @@ def test_scrape_successful(scraper):
     # scrape
     data = scraper("1725088232")
     assert len(data) == 2
+    assert isinstance(data, PortalResults)
     for result in data:
-        assert isinstance(result, PortalSummary)
+        assert isinstance(result, PortalResult)
 
 
 def test_scrape_failure(scraper):
