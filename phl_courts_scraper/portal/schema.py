@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Iterator, List, Optional
 
+import pandas as pd
+
 from ..utils import DataclassBase
 
 
@@ -77,3 +79,10 @@ class PortalResults(DataclassBase):
     def __repr__(self):
         cls = self.__class__.__name__
         return f"{cls}(num_results={len(self)})"
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Return a dataframe representation of the data,
+        where each row represents a result.
+        """
+        return pd.DataFrame([c.to_dict() for c in self])
