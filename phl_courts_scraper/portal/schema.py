@@ -62,7 +62,7 @@ class PortalResults(DataclassBase):
     data
     """
 
-    data: List[Optional[PortalResult]]
+    data: List[PortalResult]
 
     def __iter__(self) -> Iterator[PortalResult]:
         """Yield the object's results."""
