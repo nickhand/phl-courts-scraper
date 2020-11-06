@@ -12,6 +12,7 @@ retry = "*"
 pdfplumber = "*"
 intervaltree = "*"
 webdriver-manager = "*"
+desert = "*"
 
 [dev-packages]
 pre-commit = "*"

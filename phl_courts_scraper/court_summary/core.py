@@ -1,18 +1,21 @@
-from __future__ import annotations
+"""Module for parsing court summary reports."""
 
 import collections
-import json
 from dataclasses import dataclass
 from operator import attrgetter, itemgetter
-from pathlib import Path
-from typing import ClassVar, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
-import numpy as np
+from ..utils import (
+    Word,
+    find_nearest,
+    get_pdf_words,
+    group_into_lines,
+    groupby,
+    to_snake_case,
+)
+from .schema import CourtSummary
 
-from .pdf import Word, get_pdf_words
-from .utils import find_nearest, format_dict_keys, group_into_lines, groupby
-
-__all__ = ["CourtSummary"]
+__all__ = ["CourtSummaryParser"]
 
 COUNTIES = [
     "Clarion",
@@ -201,7 +204,9 @@ def _parse_raw_docket(
                 continue
 
             # Start of new charge
-            if line[0].text.isdigit():
+            if line[0].text.isdigit() and _vertically_aligned(
+                line[0].x, header_lines[0][0].x, tol=1
+            ):
 
                 if row is not None:
                     results.append(row)
@@ -240,19 +245,20 @@ def _parse_raw_docket(
                 results.append(row)
 
     # Format the string keys in header
-    header_info = format_dict_keys(header_info)
+    header_info = to_snake_case(header_info)
     header_info["extra"] = extra
 
     # Format the string keys in results
-    results = [format_dict_keys(r) for r in results]
+    results = [to_snake_case(r) for r in results]
     for r in results:
-        r["sentences"] = [format_dict_keys(d) for d in r["sentences"]]
+        r["sentences"] = [to_snake_case(d) for d in r["sentences"]]
 
     return {"header": header_info, "charges": results}
 
 
 def _parse_header(words: List[Word], firstSectionTitle: str) -> dict:
     """Parse the header component of the court summary."""
+
     # Get the line number containing "Active"
     i = _find_line_numbers(words, firstSectionTitle)
 
@@ -382,15 +388,13 @@ def _find_line_numbers(
 
 def _yield_dockets(dockets: List[Word]) -> List[Word]:
     """
-    Yield words associated with all of the dockets
-    of a specific kind, either "Active" or "Closed".
+    Yield words associated with all of the unique dockets,
+    separated by docket numbers in the input list of words.
 
     Parameters
     ----------
     words :
         the list of words to parse
-    kind :
-        either "Active" or "Closed"
 
     Yields
     ------
@@ -456,7 +460,7 @@ def _yield_dockets(dockets: List[Word]) -> List[Word]:
         # This docket number
         this_docket_num = docket_numbers[i]
 
-        # Skip dockets we've alreay returned
+        # Skip dockets we've already returned
         if this_docket_num in returned:
             continue
 
@@ -476,42 +480,47 @@ def _yield_dockets(dockets: List[Word]) -> List[Word]:
 
 
 @dataclass
-class CourtSummary:
-    """Parser for Court Summary Reports."""
+class CourtSummaryParser:
+    """A class to parse court summary reports.
 
-    path: Union[str, Path]
-    SECTION_HEADERS: ClassVar[List[str]] = [
-        "Active",
-        "Closed",
-        "Inactive",
-        "Archived",
-        "Adjudicated",
-    ]
+    Parameters
+    ----------
+    path :
+        the path to the PDF report to parse
+    """
 
-    def __post_init__(self):
-        """Parse and save the input PDF."""
+    path: str
 
-        # Store path as str
-        self.path = str(self.path)
+    def __call__(self):
+        """Parse and return a court summary document."""
 
-        # Parse PDF
-        self.words = get_pdf_words(self.path)
+        # Parse PDF into a list of words
+        words = get_pdf_words(self.path)
+
+        # Define the section headers
+        headers = [
+            "Active",
+            "Closed",
+            "Inactive",
+            "Archived",
+            "Adjudicated",
+        ]
 
         # Determine section headers
         starts = {}
-        for hdr in self.SECTION_HEADERS:
-            line = _find_line_numbers(self.words, hdr, missing="ignore")
+        for header in headers:
+            line = _find_line_numbers(words, header, missing="ignore")
             if line != []:
-                starts[hdr] = line
+                starts[header] = line
 
-        # Put it in the correct order (ascending)
+        # Put the section in the correct order (ascending)
         sections = sorted(starts, key=itemgetter(1))
         sorted_starts = collections.OrderedDict()
         for key in sections:
             sorted_starts[key] = starts[key]
 
-        # Parse the dockets
-        self.dockets = collections.OrderedDict()
+        # Parse each section
+        dockets = []
         for i, this_section in enumerate(sorted_starts):
 
             # Skip the "Archived" section
@@ -528,100 +537,32 @@ class CourtSummary:
             )
 
             # Trim the words to just lines in this section
-            words_this_section = self.words[
-                this_section_start:next_section_start
-            ]
+            section_words = words[this_section_start:next_section_start]
 
-            dockets = {}
-            for docket_number, county, docket in _yield_dockets(
-                words_this_section
-            ):
+            # Parse dockets in this section
+            for docket_number, county, docket in _yield_dockets(section_words):
 
                 # Do the parsing work
-                info = _parse_raw_docket(docket_number, docket)
+                result = _parse_raw_docket(docket_number, docket)
 
-                # Store the county
-                info["header"]["county"] = county
+                # Format the result
+                info = result["header"]
+                info["county"] = county
+                info["docket_number"] = docket_number
+                info["status"] = this_section.lower()
+                info["charges"] = result["charges"]
 
-                if docket_number not in dockets:
-                    dockets[docket_number] = info
-                else:
-                    dockets[docket_number]["header"].update(info["header"])
-                    dockets[docket_number]["charges"] += info["charges"]
+                # Fix columns
+                if "prob_#" in info:
+                    info["prob_num"] = info.pop("prob_#")
+                if "psi#" in info:
+                    info["psi_num"] = info.pop("psi#")
 
-            self.dockets[this_section] = dockets
+                # Save the result
+                dockets.append(info)
 
-    def __getitem__(self, key):
-        if key not in self.sections:
-            raise KeyError(f"No such section '{key}'")
-        return self.dockets[key]
+        # Parse the header too
+        out = _parse_header(words, sections[0])
+        out["dockets"] = dockets
 
-    @property
-    def sections(self):
-        """Sections in the court summary report."""
-        return list(self.dockets)
-
-    @property
-    def header(self) -> dict:
-        """The header of the court summary."""
-        return _parse_header(self.words, self.sections[0])
-
-    def asdict(self, slim: bool = False):
-        """Convert the class to a dictionary."""
-
-        out = {}
-        for key in ["path", "header", "dockets"]:
-            out[key] = getattr(self, key)
-
-        if not slim:
-            out["words"] = [word.__dict__ for word in self.words]
-
-        return out
-
-    def to_json(
-        self, path: Optional[Union[Path, str]] = None, slim: bool = False
-    ) -> Optional[str]:
-        """Convert to json representation."""
-
-        if path:
-            if isinstance(path, str):
-                path = Path(path)
-
-            with path.open("w") as fp:
-                json.dump(self.asdict(slim=slim), fp)
-
-        else:
-            return json.dumps(self.asdict(slim=slim))
-
-    @classmethod
-    def from_json(cls, path: Union[Path, str]) -> CourtSummary:
-        """Load data from a json file."""
-
-        if isinstance(path, str):
-            # Try to load as json first
-            try:
-                d = json.loads(path)
-            except Exception:
-                if Path(path).exists():
-                    d = json.load(path.open("r"))
-                else:
-                    raise ValueError(
-                        "Unable to interpret input string as path or valid json string."
-                    )
-        else:
-            d = json.load(path.open("r"))
-
-        # Convert words to objects
-        if "words" in d:
-            d["words"] = [Word(**word) for word in d["words"]]
-        else:
-            d["words"] = None
-
-        # Initialize
-        out = cls(path=d.pop("path"))
-
-        # Add other attributes
-        for key in ["words", "header", "dockets"]:
-            out.__dict__[key] = d[key]
-
-        return out
+        return CourtSummary.from_dict(out)

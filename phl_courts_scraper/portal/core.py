@@ -1,4 +1,4 @@
-"""Scrape data from the Unified Judicial System portal for PA"""
+"""Scrape data from the PA Unified Judicial System portal."""
 
 from dataclasses import dataclass
 from typing import Callable, List, Optional
@@ -11,6 +11,10 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
+
+from .schema import PortalSummary
+
+__all__ = ["UJSPortalScraper"]
 
 # The URL of the portal
 PORTAL_URL = "https://ujsportal.pacourts.us/DocketSheets/MC.aspx"
@@ -35,14 +39,14 @@ def _any_of(*expected_conditions: Callable) -> Callable[[object], bool]:
 
 
 @dataclass
-class IncidentNumberScraper:
+class UJSPortalScraper:
     """Scrape the UJS courts portal by incident number.
 
     Parameters
     ----------
-    driver
+    driver :
         the selenium web driver that runs the scraping
-    url
+    url :
         the url to scrape; default is the municipal courts UJS portal
     """
 
@@ -68,7 +72,7 @@ class IncidentNumberScraper:
             "Police Incident/Complaint Number"
         )
 
-    def scrape(self, dc_number: str) -> Optional[List[dict]]:
+    def __call__(self, dc_number: str) -> Optional[List[PortalSummary]]:
         """
         Given an input DC number for a police incident, return
         the relevant details from the courts portal.
@@ -81,7 +85,8 @@ class IncidentNumberScraper:
         Returns
         -------
         results
-            a list of dictionaries holding details for each unique docket number
+            a list of PortalSummary objects holding details for each unique
+            docket number
         """
 
         # Get the input element for the DC number
@@ -160,7 +165,7 @@ class IncidentNumberScraper:
                 ]
                 X["court_summary_url"] = urls[-1]
                 X["docket_sheet_url"] = urls[-2]
-                out.append(X)
+                out.append(PortalSummary.from_dict(X))
         except NoSuchElementException:
             pass
 
