@@ -1,6 +1,6 @@
 """Define the schema for the court summary."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from typing import Any, Iterator, List, Optional, Union
 
 import pandas as pd
@@ -75,6 +75,17 @@ class Charge(DataclassBase):
     grade: Optional[str]
     disposition: Optional[str]
     sentences: Optional[List[Sentence]]
+
+    @property
+    def meta(self):
+        """A dict of the meta info associated with the charge"""
+
+        exclude = ["sentences"]
+        return {
+            f.name: getattr(self, f.name)
+            for f in fields(self)
+            if f.name not in exclude
+        }
 
     def __iter__(self) -> Iterator[Sentence]:
         """Iterate through the sentences."""
@@ -202,6 +213,17 @@ class Docket(DataclassBase):
         )
         return out
 
+    @property
+    def meta(self):
+        """A dict of the meta info associated with the docket"""
+
+        exclude = ["charges"]
+        return {
+            f.name: getattr(self, f.name)
+            for f in fields(self)
+            if f.name not in exclude
+        }
+
     def __getitem__(self, index):
         """Index the charges."""
         return self.charges.__getitem__(index)
@@ -291,6 +313,17 @@ class CourtSummary(DataclassBase):
 
         # Each row is a Docket
         return out
+
+    @property
+    def meta(self):
+        """A dict of the meta info associated with the court summary."""
+
+        exclude = ["dockets"]
+        return {
+            f.name: getattr(self, f.name)
+            for f in fields(self)
+            if f.name not in exclude
+        }
 
     def __iter__(self) -> Iterator[Docket]:
         """Yield the object's dockets."""
