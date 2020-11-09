@@ -35,5 +35,6 @@ setup(
         "webdriver_manager",
         "intervaltree",
         "pdfplumber",
+        "desert",
     ],
 )
