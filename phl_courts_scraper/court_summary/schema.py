@@ -93,7 +93,7 @@ class Charge(DataclassBase):
 
         cols = ["seq_no", "statute", "description"]
         s = ", ".join([f"{col}='{getattr(self, col)}'" for col in cols])
-        s += f", len(sentences)={len(self.sentences)}"
+        s += f", num_sentences={len(self.sentences)}"
         return f"{cls}({s})"
 
 
