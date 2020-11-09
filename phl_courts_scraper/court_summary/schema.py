@@ -277,8 +277,7 @@ class CourtSummary(DataclassBase):
     aliases :
         List of aliases for the defendant
     dockets :
-        List of Docket objects on the court summary, sorted by
-        arrest date.
+        List of Docket objects on the court summary
     """
 
     name: str
@@ -290,13 +289,6 @@ class CourtSummary(DataclassBase):
     location: str
     aliases: List[str]
     dockets: List[Docket]
-
-    def __post_init__(self) -> None:
-
-        # Sort by arrest date
-        self.dockets = sorted(
-            self.dockets, key=lambda x: x.arrest_dt, reverse=True
-        )
 
     def to_pandas(self) -> pd.DataFrame:
         """
