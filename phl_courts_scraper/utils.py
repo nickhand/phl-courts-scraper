@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime
 import itertools
 import json
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from operator import attrgetter, itemgetter
 from pathlib import Path
 from typing import (
@@ -183,8 +183,7 @@ class DataclassSchema:
 
     def to_dict(self) -> dict:
         """Return a dictionary representation of the data."""
-        schema = desert.schema(self.__class__)
-        return schema.dump(self)
+        return asdict(self)
 
     def to_json(
         self, path: Optional[Union[str, Path]] = None
@@ -199,13 +198,17 @@ class DataclassSchema:
             the file path to save the JSON encoding to
         """
 
+        # Dump to a dictionary
+        schema = desert.schema(self.__class__)
+        d = schema.dump(self)
+
         if path is None:
-            return json.dumps(self.to_dict())
+            return json.dumps(d)
         else:
             if isinstance(path, str):
                 path = Path(path)
             json.dump(
-                self.to_dict(), path.open("w"),
+                d, path.open("w"),
             )
 
             return None
