@@ -3,11 +3,11 @@ from typing import Iterator, List, Optional
 
 import pandas as pd
 
-from ..utils import DataclassBase
+from ..utils import DataclassSchema
 
 
 @dataclass
-class PortalResult(DataclassBase):
+class PortalResult(DataclassSchema):
     """
     A single result returned on the main UJS portal page when
     searching by incident number.
@@ -52,7 +52,7 @@ class PortalResult(DataclassBase):
 
 
 @dataclass
-class PortalResults(DataclassBase):
+class PortalResults(DataclassSchema):
     """
     All of the results returned on the main UJS portal page when
     searching by incident number.

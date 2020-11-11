@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import datetime
 import itertools
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from operator import attrgetter, itemgetter
 from pathlib import Path
 from typing import (
@@ -111,14 +112,14 @@ def find_nearest(array: Iterable, value: str) -> int:
 
 def group_into_lines(
     words: List[Word], tolerance: int = 10
-) -> Dict[int, List[Word]]:
+) -> Dict[float, List[Word]]:
     """Group words into lines, with a specified tolerance."""
     tree = IntervalTree()
     for i in range(len(words)):
         y = words[i].y
-        tree[y - tolerance : y + tolerance] = words[i]
+        tree[y - tolerance : y + tolerance] = words[i]  # type: ignore
 
-    result = {}
+    result: Dict[float, List[Word]] = {}
     for y in sorted(np.unique([w.y for w in words])):
         objs = [iv.data for iv in tree[y]]
         values = sorted(objs, key=attrgetter("x"))
@@ -129,23 +130,12 @@ def group_into_lines(
     return result
 
 
-class TimestampEncoder(json.JSONEncoder):
-    """Custom JSON encoder to handle pandas timestamps."""
-
-    def default(self, obj):
-        if isinstance(obj, pd.Timestamp):
-            return obj.strftime("%m/%d/%y")
-        if pd.isnull(obj):
-            return ""
-        return json.JSONEncoder.default(self, obj)
-
-
 # Create a generic variable that can be 'Parent', or any subclass.
-T = TypeVar("T", bound="DataclassBase")
+T = TypeVar("T", bound="DataclassSchema")
 
 
-class DataclassBase:
-    """Base class to handled serializing dataclasses."""
+class DataclassSchema:
+    """Base class to handled serializing and deserializing dataclasses."""
 
     @classmethod
     def from_dict(cls: Type[T], data: dict) -> T:
@@ -187,13 +177,14 @@ class DataclassBase:
             pass
         finally:
             if d is None:
-                d = json.loads(path_or_json)
+                d = json.loads(str(path_or_json))
 
         return cls.from_dict(d)
 
     def to_dict(self) -> dict:
         """Return a dictionary representation of the data."""
-        return asdict(self)
+        schema = desert.schema(self.__class__)
+        return schema.dump(self)
 
     def to_json(
         self, path: Optional[Union[str, Path]] = None
@@ -209,10 +200,12 @@ class DataclassBase:
         """
 
         if path is None:
-            return json.dumps(self.to_dict(), cls=TimestampEncoder)
+            return json.dumps(self.to_dict())
         else:
             if isinstance(path, str):
                 path = Path(path)
-            return json.dump(
-                self.to_dict(), path.open("w"), cls=TimestampEncoder
+            json.dump(
+                self.to_dict(), path.open("w"),
             )
+
+            return None

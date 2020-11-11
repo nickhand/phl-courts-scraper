@@ -1,41 +1,60 @@
 """Define the schema for the court summary."""
 
+import datetime
 from dataclasses import dataclass, fields
 from typing import Any, Iterator, List, Optional, Union
 
+import desert
+import marshmallow
 import pandas as pd
 
-from ..utils import DataclassBase
+from ..utils import DataclassSchema
 
 __all__ = ["CourtSummary", "Docket", "Charge", "Sentence"]
 
 
+class TimeField(marshmallow.fields.DateTime):
+    """Custom time field to handle string to datetime conversion."""
+
+    def _serialize(self, value, attr, obj, **kwargs):
+        if not value:
+            return ""
+        if isinstance(value, datetime.datetime):
+            return value.strftime("%m/%d/%Y")
+        return super()._serialize(value, attr, obj, **kwargs)
+
+    def _deserialize(self, value, attr, data, **kwargs):
+        if value == "":
+            return None
+        if isinstance(value, datetime.datetime):
+            return value
+
+        return super()._deserialize(value, attr, data, **kwargs)
+
+
 @dataclass
-class Sentence(DataclassBase):
+class Sentence(DataclassSchema):
     """
     A Sentence object.
 
     Parameters
     ----------
-    sentence_dt :
-        the date of the sentence
     sentence_type :
         the sentence type
-    program_period :
+    program_period : optional
         the program period
-    sentence_length :
+    sentence_length : optional
         the length of the sentence
+    sentence_dt :
+        the date of the sentence
     """
 
-    sentence_dt: str
     sentence_type: str
     program_period: Optional[str]
     sentence_length: Optional[str]
-
-    def __post_init__(self):
-
-        # Store the sentence date as a datetime
-        self.sentence_dt = pd.to_datetime(self.sentence_dt)
+    sentence_dt: str = desert.field(
+        TimeField(format="%m/%d/%Y", allow_none=True)
+    )
 
     def __repr__(self):
         cls = self.__class__.__name__
@@ -49,7 +68,7 @@ class Sentence(DataclassBase):
 
 
 @dataclass
-class Charge(DataclassBase):
+class Charge(DataclassSchema):
     """
     A Charge object.
 
@@ -74,7 +93,7 @@ class Charge(DataclassBase):
     description: Optional[str]
     grade: Optional[str]
     disposition: Optional[str]
-    sentences: Optional[List[Sentence]]
+    sentences: List[Sentence] = []
 
     @property
     def meta(self):
@@ -109,7 +128,7 @@ class Charge(DataclassBase):
 
 
 @dataclass
-class Docket(DataclassBase):
+class Docket(DataclassSchema):
     """
     A Docket object.
 
@@ -166,38 +185,34 @@ class Docket(DataclassBase):
     proc_status: str
     dc_no: str
     otn: str
-    arrest_dt: str
     county: str
     status: str
     extra: List[Any]
     psi_num: Optional[str]
     prob_num: Optional[str]
-    disp_date: Optional[str]
     disp_judge: Optional[str]
     def_atty: Optional[str]
-    trial_dt: Optional[str]
     legacy_no: Optional[str]
     last_action: Optional[str]
-    last_action_date: Optional[str]
     last_action_room: Optional[str]
     next_action: Optional[str]
-    next_action_date: Optional[str]
     next_action_room: Optional[str]
-    charges: Optional[List[Charge]]
-
-    def __post_init__(self) -> None:
-
-        # Convert columns to datetime objects
-        for col in [
-            "arrest_dt",
-            "disp_date",
-            "trial_dt",
-            "last_action_date",
-            "next_action_date",
-        ]:
-            value = getattr(self, col)
-            if isinstance(value, str):
-                setattr(self, col, pd.to_datetime(value))
+    charges: List[Charge] = []
+    arrest_dt: str = desert.field(
+        TimeField(format="%m/%d/%Y", allow_none=True)
+    )
+    next_action_date: Optional[str] = desert.field(
+        TimeField(format="%m/%d/%Y", allow_none=True), default=""
+    )
+    last_action_date: Optional[str] = desert.field(
+        TimeField(format="%m/%d/%Y", allow_none=True), default=""
+    )
+    trial_dt: Optional[str] = desert.field(
+        TimeField(format="%m/%d/%Y", allow_none=True), default=""
+    )
+    disp_date: Optional[str] = desert.field(
+        TimeField(format="%m/%d/%Y", allow_none=True), default=""
+    )
 
     def to_pandas(self) -> pd.DataFrame:
         """
@@ -236,7 +251,7 @@ class Docket(DataclassBase):
         """The number of charges."""
         return len(self.charges)
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         cls = self.__class__.__name__
 
         if not pd.isna(self.arrest_dt):
@@ -255,7 +270,7 @@ class Docket(DataclassBase):
 
 
 @dataclass
-class CourtSummary(DataclassBase):
+class CourtSummary(DataclassSchema):
     """A Court Summary object.
 
     Parameters
