@@ -1,7 +1,7 @@
 """Define the schema for the court summary report."""
 
 import datetime
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from typing import Any, Iterator, List, Optional, Union
 
 import desert
@@ -97,7 +97,7 @@ class Charge(DataclassSchema):
     description: Optional[str]
     grade: Optional[str]
     disposition: Optional[str]
-    sentences: List[Sentence] = []
+    sentences: List[Sentence] = field(default_factory=list)
 
     @property
     def meta(self):
@@ -201,7 +201,6 @@ class Docket(DataclassSchema):
     last_action_room: Optional[str]
     next_action: Optional[str]
     next_action_room: Optional[str]
-    charges: List[Charge] = []
     arrest_dt: str = desert.field(
         TimeField(format="%m/%d/%Y", allow_none=True)
     )
@@ -217,6 +216,7 @@ class Docket(DataclassSchema):
     disp_date: Optional[str] = desert.field(
         TimeField(format="%m/%d/%Y", allow_none=True), default=""
     )
+    charges: List[Charge] = field(default_factory=list)
 
     def to_pandas(self) -> pd.DataFrame:
         """
