@@ -54,11 +54,11 @@ class Sentence(DataclassSchema):
     """
 
     sentence_type: str
-    program_period: Optional[str]
-    sentence_length: Optional[str]
     sentence_dt: str = desert.field(
         TimeField(format="%m/%d/%Y", allow_none=True)
     )
+    program_period: str = ""
+    sentence_length: str = ""
 
     def __repr__(self):
         cls = self.__class__.__name__
@@ -94,9 +94,9 @@ class Charge(DataclassSchema):
 
     seq_no: str
     statute: str
-    description: Optional[str]
-    grade: Optional[str]
-    disposition: Optional[str]
+    description: str = ""
+    grade: str = ""
+    disposition: str = ""
     sentences: List[Sentence] = field(default_factory=list)
 
     @property
@@ -192,18 +192,18 @@ class Docket(DataclassSchema):
     county: str
     status: str
     extra: List[Any]
-    psi_num: Optional[str]
-    prob_num: Optional[str]
-    disp_judge: Optional[str]
-    def_atty: Optional[str]
-    legacy_no: Optional[str]
-    last_action: Optional[str]
-    last_action_room: Optional[str]
-    next_action: Optional[str]
-    next_action_room: Optional[str]
     arrest_dt: str = desert.field(
         TimeField(format="%m/%d/%Y", allow_none=True)
     )
+    psi_num: str = ""
+    prob_num: str = ""
+    disp_judge: str = ""
+    def_atty: str = ""
+    legacy_no: str = ""
+    last_action: str = ""
+    last_action_room: str = ""
+    next_action: str = ""
+    next_action_room: str = ""
     next_action_date: Optional[str] = desert.field(
         TimeField(format="%m/%d/%Y", allow_none=True), default=""
     )
