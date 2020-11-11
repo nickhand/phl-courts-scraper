@@ -1,4 +1,4 @@
-"""Define the schema for the court summary."""
+"""Define the schema for the court summary report."""
 
 import datetime
 from dataclasses import dataclass, fields
@@ -17,6 +17,8 @@ class TimeField(marshmallow.fields.DateTime):
     """Custom time field to handle string to datetime conversion."""
 
     def _serialize(self, value, attr, obj, **kwargs):
+        """Return string representation of datetime objects."""
+
         if not value:
             return ""
         if isinstance(value, datetime.datetime):
@@ -24,6 +26,8 @@ class TimeField(marshmallow.fields.DateTime):
         return super()._serialize(value, attr, obj, **kwargs)
 
     def _deserialize(self, value, attr, data, **kwargs):
+        """Convert strings to datetime objects."""
+
         if value == "":
             return None
         if isinstance(value, datetime.datetime):
@@ -219,10 +223,10 @@ class Docket(DataclassSchema):
         Return a dataframe representation of the data,
         where each row represents a separate charge.
         """
-        # Each row is a Docket
+        # Each row is a Charge
         out = pd.DataFrame([c.to_dict() for c in self])
 
-        # Convert charge dicts to Charge objects
+        # Convert sentences dicts to Sentence objects
         out["sentences"] = out["sentences"].apply(
             lambda l: [Sentence(**v) for v in l]
         )
