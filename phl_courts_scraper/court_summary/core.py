@@ -410,13 +410,18 @@ def _yield_dockets(dockets: List[Word]) -> List[Word]:
         # Loop over header row
         # REMOVE: any "Continued" lines of FJD / Court Summary header
         for i in reversed(range(0, max_header_size)):
-            w = dockets[pg + i]
-            if (
-                w.text
-                in ["First Judicial District of Pennsylvania", "Court Summary"]
-                or "Continued" in w.text
-            ):
-                del dockets[pg + i]
+
+            if pg + i < len(dockets) - 1:
+                w = dockets[pg + i]
+                if (
+                    w.text
+                    in [
+                        "First Judicial District of Pennsylvania",
+                        "Court Summary",
+                    ]
+                    or "Continued" in w.text
+                ):
+                    del dockets[pg + i]
 
     # Get docket numbers
     docket_info = [
