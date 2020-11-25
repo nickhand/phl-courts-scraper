@@ -17,7 +17,7 @@ from .schema import CourtSummary
 
 __all__ = ["CourtSummaryParser"]
 
-COUNTIES = {
+COUNTY_CODES = {
     "1": "Adams",
     "35": "Lackawanna",
     "2": "Allegheny",
@@ -236,10 +236,6 @@ def _parse_raw_docket(
                             row[key] += " " + line_dict[key]
                         elif key in row["sentences"]:
                             row["sentences"][key] += " " + line_dict[key]
-                        else:
-                            raise ValueError(
-                                "Error parsing docket lines — this should never happen!"
-                            )
 
             if i == len(lines_y) - 1:
                 results.append(row)
@@ -430,6 +426,7 @@ def _yield_dockets(dockets: List[Word]) -> List[Word]:
     ]
 
     indices, docket_numbers = list(zip(*docket_info))
+
     indices = list(indices) + [None]
 
     # Yield the parts for each docket
@@ -451,9 +448,9 @@ def _yield_dockets(dockets: List[Word]) -> List[Word]:
         start = indices[i]
         stop = indices[j]
 
-        # Determine the county
+        # Determine county
         county_code = int(this_docket_num.split("-")[1])
-        county = COUNTIES[str(county_code)]
+        county = COUNTY_CODES[str(county_code)]
 
         # Return
         yield this_docket_num, county, dockets[start:stop]
