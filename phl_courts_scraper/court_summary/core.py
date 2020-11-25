@@ -17,75 +17,75 @@ from .schema import CourtSummary
 
 __all__ = ["CourtSummaryParser"]
 
-COUNTIES = [
-    "Clarion",
-    "Blair",
-    "Elk",
-    "Cumberland",
-    "Greene",
-    "Westmoreland",
-    "Mercer",
-    "Butler",
-    "Washington",
-    "Beaver",
-    "Snyder",
-    "Perry",
-    "Tioga",
-    "Berks",
-    "Bucks",
-    "Lawrence",
-    "Lehigh",
-    "Bradford",
-    "Allegheny",
-    "Susquehanna",
-    "Monroe",
-    "Wyoming",
-    "Wayne",
-    "Lackawanna",
-    "Clinton",
-    "Bedford",
-    "Erie",
-    "Centre",
-    "Jefferson",
-    "Cambria",
-    "Delaware",
-    "Franklin",
-    "Indiana",
-    "Chester",
-    "Lycoming",
-    "Potter",
-    "Forest",
-    "Clearfield",
-    "Crawford",
-    "Huntingdon",
-    "Mifflin",
-    "Lancaster",
-    "Sullivan",
-    "York",
-    "Schuylkill",
-    "Montgomery",
-    "Lebanon",
-    "Northumberland",
-    "McKean",
-    "Venango",
-    "Fulton",
-    "Montour",
-    "Adams",
-    "Armstrong",
-    "Carbon",
-    "Columbia",
-    "Dauphin",
-    "Fayette",
-    "Luzerne",
-    "Somerset",
-    "Cameron",
-    "Northampton",
-    "Juniata",
-    "Pike",
-    "Union",
-    "Warren",
-    "Philadelphia",
-]
+COUNTIES = {
+    "1": "Adams",
+    "35": "Lackawanna",
+    "2": "Allegheny",
+    "36": "Lancaster",
+    "3": "Armstrong",
+    "37": "Lawrence",
+    "4": "Beaver",
+    "38": "Lebanon",
+    "5": "Bedford",
+    "39": "Lehigh",
+    "6": "Berks",
+    "40": "Luzerne",
+    "7": "Blair",
+    "41": "Lycoming",
+    "8": "Bradford",
+    "42": "McKean",
+    "9": "Bucks",
+    "43": "Mercer",
+    "10": "Butler",
+    "44": "Mifflin",
+    "11": "Cambria",
+    "45": "Monroe",
+    "12": "Cameron",
+    "46": "Montgomery",
+    "13": "Carbon",
+    "47": "Montour",
+    "14": "Centre",
+    "48": "Northampton",
+    "15": "Chester",
+    "49": "Northumberland",
+    "16": "Clarion",
+    "50": "Perry",
+    "17": "Clearfield",
+    "51": "Philadelphia",
+    "18": "Clinton",
+    "52": "Pike",
+    "19": "Columbia",
+    "53": "Potter",
+    "20": "Crawford",
+    "54": "Schuylkill",
+    "21": "Cumberland",
+    "55": "Snyder",
+    "22": "Dauphin",
+    "56": "Somerset",
+    "23": "Delaware",
+    "57": "Sullivan",
+    "24": "Elk",
+    "58": "Susquehanna",
+    "25": "Erie",
+    "59": "Tioga",
+    "26": "Fayette",
+    "60": "Union",
+    "27": "Forest",
+    "61": "Venango",
+    "28": "Franklin",
+    "62": "Warren",
+    "29": "Fulton",
+    "63": "Washington",
+    "30": "Greene",
+    "64": "Wayne",
+    "31": "Huntingdon",
+    "65": "Westmoreland",
+    "32": "Indiana",
+    "66": "Wyoming",
+    "33": "Jefferson",
+    "67": "York",
+    "34": "Juniata",
+}
 
 
 def _vertically_aligned(x0, x1, tol=3):
@@ -430,28 +430,7 @@ def _yield_dockets(dockets: List[Word]) -> List[Word]:
     ]
 
     indices, docket_numbers = list(zip(*docket_info))
-
     indices = list(indices) + [None]
-    counties = []
-
-    for i in range(len(indices) - 1):
-
-        #
-        prev_word = dockets[indices[i] - 1]
-        first_word = dockets[indices[i]]
-
-        # Vertically aligned
-        # Prev line is county
-        if (
-            _vertically_aligned(prev_word.x, first_word.x, tol=0.5)
-            and prev_word.text.strip() in COUNTIES
-        ):
-            counties.append(prev_word.text)
-            indices[i] = indices[i] - 1
-        else:
-            if not len(counties):
-                raise ValueError("Cannot determine county information")
-            counties.append(counties[-1])
 
     # Yield the parts for each docket
     returned = []
@@ -472,8 +451,11 @@ def _yield_dockets(dockets: List[Word]) -> List[Word]:
         start = indices[i]
         stop = indices[j]
 
+        # Determine the county
+        county = COUNTIES[this_docket_num.split("-")[1]]
+
         # Return
-        yield this_docket_num, counties[i], dockets[start:stop]
+        yield this_docket_num, county, dockets[start:stop]
 
         # Track which ones we've returned
         returned.append(this_docket_num)
