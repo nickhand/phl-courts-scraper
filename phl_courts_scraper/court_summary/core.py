@@ -452,7 +452,8 @@ def _yield_dockets(dockets: List[Word]) -> List[Word]:
         stop = indices[j]
 
         # Determine the county
-        county = COUNTIES[this_docket_num.split("-")[1]]
+        county_code = int(this_docket_num.split("-")[1])
+        county = COUNTIES[str(county_code)]
 
         # Return
         yield this_docket_num, county, dockets[start:stop]
