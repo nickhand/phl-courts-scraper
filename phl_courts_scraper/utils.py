@@ -183,7 +183,8 @@ class DataclassSchema:
 
     def to_dict(self) -> dict:
         """Return a dictionary representation of the data."""
-        return asdict(self)
+        schema = desert.schema(self.__class__)
+        return schema.dump(self)
 
     def to_json(
         self, path: Optional[Union[str, Path]] = None
