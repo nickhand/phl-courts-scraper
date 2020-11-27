@@ -3,7 +3,7 @@
 import collections
 from dataclasses import dataclass
 from operator import attrgetter, itemgetter
-from typing import List, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 from ..utils import (
     Word,
@@ -88,36 +88,70 @@ COUNTY_CODES = {
 }
 
 
-def _vertically_aligned(x0, x1, tol=3):
+def _check_abs_diff(x0: float, x1: float, tol: float = 3) -> bool:
+    """
+    Test if the absolute diff b/w two numbers is
+    within a certain tolerance.
+
+    Parameters
+    ----------
+    x0, x1 :
+        the numbers to difference
+    tol :
+        the tolerance (inclusive)
+    """
     return abs(x0 - x1) <= tol
 
 
-def _horizontally_aligned(y0, y1, tol=3):
-    return abs(y0 - y1) <= tol
+def _get_line_as_dict(line: List[Word], header: List[Word]) -> dict:
+    """
+    Give a line and the header for that line, find the correct
+    column for each line word, and return a dictionary of keys/values.
 
-
-def _get_line_as_dict(header, line):
-
-    r = {}
-    header_values = [w.text for w in header]
-    for iline in range(len(line)):
-        w = line[iline]
-        nearest = find_nearest([h.x for h in header], w.x)
-        r[header_values[nearest]] = w.text
-    return r
-
-
-def _parse_raw_docket(
-    docket_number: str, words: List[Word]
-) -> Tuple[str, dict]:
-    """Parse the raw docket words.
+    Parameters
+    ----------
+    line :
+        the line to return as a dict
+    header :
+        the header line to use to determine column headers
 
     Returns
     -------
-    docket_number :
-        the docket number
-    info :
-        dict holding header info and charges info
+    out :
+        The line in dict form, with column headers as keys
+    """
+    out = {}
+
+    # These are the column headers
+    column_headers = [w.text for w in header]
+    header_x = [w.x for w in header]
+
+    # Find the nearest column header and save
+    for i in range(len(line)):
+
+        # Find the index of the nearest column match
+        word = line[i]
+        nearest = find_nearest(header_x, word.x)
+
+        # The matching column header
+        col = column_headers[nearest]
+
+        # Save
+        out[col] = word.text
+
+    return out
+
+
+def _parse_raw_docket(docket_number: str, words: List[Word]) -> Dict:
+    """
+    Parse the raw docket words into a dict of header info and
+    charges info.
+
+    Returns
+    -------
+    result :
+        A dict with keys "header" holding the header info for the docket
+        and "charges" holding the charge information
     """
 
     # Determine headers
@@ -143,7 +177,7 @@ def _parse_raw_docket(
     header_lines = list(H.values())
 
     # Determine unique ones and multiheader status
-    header_values = []
+    header_values: List[List[str]] = []
     keep = []
     for i, elem in enumerate(header_lines):
         texts = [w.text for w in elem]
@@ -162,24 +196,31 @@ def _parse_raw_docket(
     docket_header, docket_body = _parse_docket_header(docket_number, words)
 
     # Format the rest
-    header_info = [
-        [s.strip() for s in w.text.split(":")] for w in docket_header[1:]
+    header_info: List[Tuple[str, ...]] = [
+        tuple(s.strip() for s in w.text.split(":")) for w in docket_header[1:]
     ]
 
     # IMPORTANT: ensure that ":" split gave us two fields
-    extra = []
+    extra: List[str] = []
+    header_info_dict: Dict[str, Any] = {}
     for i in reversed(range(0, len(header_info))):
         value = header_info[i]
-        if len(value) != 2:
-            value = header_info.pop(i)
-            if value[0] != docket_number:
-                extra.append(value)
 
-    # Convert to dict
-    header_info = dict(header_info)
+        # Save any extra info that wasn't
+        if len(value) != 2:
+
+            # Remove it
+            value = header_info.pop(i)
+
+            # Save it
+            if value[0] != docket_number:
+                extra += value
+
+        else:
+            header_info_dict[value[0]] = value[1]
 
     # Parse the docket body
-    results = []
+    charges = []
     if len(docket_body):
 
         # Group into lines
@@ -187,7 +228,7 @@ def _parse_raw_docket(
         lines_y = sorted(lines)  # the y-values (keys of lines)
 
         # Determine indents of rows
-        row = None
+        row: Dict[str, Any] = {}
         for i, y in enumerate(lines_y):
 
             # This is the line
@@ -203,67 +244,88 @@ def _parse_raw_docket(
             if line[0].text == docket_number:
                 continue
 
-            # Start of new charge
-            if line[0].text.isdigit() and _vertically_aligned(
+            # ----------------------------------------------
+            # OPTION 1: Start of new charge
+            # ----------------------------------------------
+            if line[0].text.isdigit() and _check_abs_diff(
                 line[0].x, header_lines[0][0].x, tol=1
             ):
 
-                if row is not None:
-                    results.append(row)
+                if len(row):
+                    charges.append(row)
 
-                # Header and line as dict
+                # Header is first line in header
                 header = header_lines[0]
-                line_dict = _get_line_as_dict(header, line)
 
-                row = line_dict.copy()
+                # Create the row object with the line data
+                row = _get_line_as_dict(line, header)
                 row["sentences"] = []
 
+            # ----------------------------------------------
+            # OPTION 2: Parsing continuation of a line
+            # ----------------------------------------------
             else:
-                if multiline_header and _vertically_aligned(
+                # ------------------------------------------
+                # OPTION 2A: This is a new sentence
+                # ------------------------------------------
+                if multiline_header and _check_abs_diff(
                     start, header_lines[1][0].x, tol=1
                 ):
-                    # Header and line as dict
-                    header = header_lines[1]
-                    line_dict = _get_line_as_dict(header, line)
 
+                    # Header is the second line of header
+                    header = header_lines[1]
+
+                    # Parse the line into a dict
+                    line_dict = _get_line_as_dict(line, header)
+
+                    # Save to a list of sentences
                     row["sentences"].append(line_dict)
+
+                # -------------------------------------------
+                # OPTION 2B: Field is continue onto new line
+                # -------------------------------------------
                 else:
 
-                    line_dict = _get_line_as_dict(header, line)
+                    # Parse this line
+                    line_dict = _get_line_as_dict(line, header)
 
+                    # Search for the the field that was continued
                     for key in line_dict:
                         if key in row:
                             row[key] += " " + line_dict[key]
                         elif key in row["sentences"]:
                             row["sentences"][key] += " " + line_dict[key]
 
+            # Last line? Save it!
             if i == len(lines_y) - 1:
-                results.append(row)
+                charges.append(row)
 
     # Format the string keys in header
-    header_info = to_snake_case(header_info)
-    header_info["extra"] = extra
+    header_info_dict = to_snake_case(header_info_dict)
+    header_info_dict["extra"] = extra
 
     # Format the string keys in results
-    results = [to_snake_case(r) for r in results]
-    for r in results:
-        r["sentences"] = [to_snake_case(d) for d in r["sentences"]]
+    charges = [to_snake_case(charge) for charge in charges]
+    for charge in charges:
+        charge["sentences"] = [to_snake_case(s) for s in charge["sentences"]]
 
-    return {"header": header_info, "charges": results}
+    return {"header": header_info_dict, "charges": charges}
 
 
 def _parse_header(words: List[Word], firstSectionTitle: str) -> dict:
     """Parse the header component of the court summary."""
 
     # Get the line number containing "Active"
-    i = _find_line_numbers(words, firstSectionTitle)
+    i = _find_line_number(words, firstSectionTitle)
 
-    out = []
+    info = []
     for key, val in groupby(words[:i], "x", sort=True):
         val = sorted(val, key=attrgetter("x"), reverse=True)  # sort by x
-        out.append((key, val))
+        info.append((key, val))
 
-    info = sorted(out, key=lambda t: min(tt.y for tt in t[1]))  # sort by min y
+    info = sorted(
+        info, key=lambda t: min(tt.y for tt in t[1])
+    )  # sort by min y
     info = info[2:]  # Drop info we don't need
 
     out = {}
@@ -304,24 +366,48 @@ def _parse_docket_header(
 
     # Group into common y values
     grouped = [list(group) for _, group in groupby(words, "y")]
-    grouped = [item for sublist in grouped for item in sublist]
+    grouped_flat = [item for sublist in grouped for item in sublist]
 
-    i = _find_line_numbers(grouped, "Seq No", missing="ignore")
+    i = _find_line_number(grouped_flat, "Seq No", missing="ignore")
 
     # If this is missing: docket continues on multiple pages
-    if i == []:
-        return grouped, []
+    if i is None:
+        return grouped_flat, []
     else:  # split into header/body -- docket is on one page
-        return grouped[:i], grouped[i:]
+        return grouped_flat[:i], grouped_flat[i:]
+
+
+def _find_line_number(
+    words: List[Word], text: str, how: str = "equals", missing: str = "raise",
+) -> Optional[int]:
+    """Return the first line number associated with a specific text.
+
+    Parameters
+    ----------
+    words :
+        the list of words to check against
+    text :
+        the word text to search for
+    how :
+        how to do the comparison; either "equals" or "contains"
+    missing :
+        if no matches are found, either raise an Exception, or
+        return an empty list
+
+    Returns
+    -------
+    line_number :
+        the first matching line number
+    """
+    indexPosList = _find_line_numbers(words, text, how=how, missing=missing)
+    if len(indexPosList) == 0:
+        return None
+    return indexPosList[0]
 
 
 def _find_line_numbers(
-    words: List[Word],
-    text: str,
-    how: str = "equals",
-    return_all: bool = False,
-    missing: str = "raise",
-) -> Union[List[int], int]:
+    words: List[Word], text: str, how: str = "equals", missing: str = "raise",
+) -> List[int]:
     """Return the line numbers associated with a specific text.
 
     Parameters
@@ -332,9 +418,6 @@ def _find_line_numbers(
         the word text to search for
     how :
         how to do the comparison; either "equals" or "contains"
-    return_all :
-        whether to return line numbers of all matches or just the
-        first match
     missing :
         if no matches are found, either raise an Exception, or
         return an empty list
@@ -342,7 +425,7 @@ def _find_line_numbers(
     Returns
     -------
     line_numbers :
-        the line numbers, either all or the first match
+        a list of line numbers matching the text
     """
     assert how in ["equals", "contains"]
 
@@ -371,20 +454,17 @@ def _find_line_numbers(
         except ValueError:
             break
 
-    if len(indexPosList) == 0:
-        if missing == "raise":
-            raise ValueError("No text matches found")
-        else:
-            return []
+    if len(indexPosList) == 0 and missing == "raise":
+        raise ValueError("No text matches found")
 
-    if not return_all:
-        indexPosList = indexPosList[0]
     return indexPosList
 
 
-def _yield_dockets(dockets: List[Word]) -> List[Word]:
+def _yield_dockets(
+    dockets: List[Word],
+) -> Iterator[Tuple[str, str, List[Word]]]:
     """
-    Yield words associated with all of the unique dockets,
+    Yield words associated with all of the unique dockets
     separated by docket numbers in the input list of words.
 
     Parameters
@@ -403,7 +483,6 @@ def _yield_dockets(dockets: List[Word]) -> List[Word]:
         _find_line_numbers(
             dockets,
             "First Judicial District of Pennsylvania",
-            return_all=True,
             missing="ignore",
         )
     ):
@@ -424,25 +503,25 @@ def _yield_dockets(dockets: List[Word]) -> List[Word]:
                     del dockets[pg + i]
 
     # Get docket numbers
-    docket_info = [
-        (i, w.text)
-        for i, w in enumerate(dockets)
-        if w.text.startswith("MC-") or w.text.startswith("CP-")
-    ]
+    indices: List[Optional[int]] = []
+    docket_numbers = []
+    for i, w in enumerate(dockets):
+        if w.text.startswith("MC-") or w.text.startswith("CP-"):
+            indices.append(i)
+            docket_numbers.append(w.text)
 
-    indices, docket_numbers = list(zip(*docket_info))
-
-    indices = list(indices) + [None]
+    # Add the ending slice index
+    indices.append(None)
 
     # Yield the parts for each docket
-    returned = []
+    returned_dockets: List[str] = []
     for i in range(len(indices) - 1):
 
         # This docket number
         this_docket_num = docket_numbers[i]
 
         # Skip dockets we've already returned
-        if this_docket_num in returned:
+        if this_docket_num in returned_dockets:
             continue
 
         # Determine the index of when the next one starts
@@ -461,7 +540,7 @@ def _yield_dockets(dockets: List[Word]) -> List[Word]:
         yield this_docket_num, county, dockets[start:stop]
 
         # Track which ones we've returned
-        returned.append(this_docket_num)
+        returned_dockets.append(this_docket_num)
 
 
 @dataclass
@@ -494,8 +573,8 @@ class CourtSummaryParser:
         # Determine section headers
         starts = {}
         for header in headers:
-            line = _find_line_numbers(words, header, missing="ignore")
-            if line != []:
+            line = _find_line_number(words, header, missing="ignore")
+            if line is not None:
                 starts[header] = line
 
         # Put the section in the correct order (ascending)

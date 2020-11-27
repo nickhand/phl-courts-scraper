@@ -149,7 +149,7 @@ class UJSPortalScraper:
             ]
 
             # extract data for each row, including links
-            out = []
+            data = []
             for row in results_rows:
 
                 # the data displayed in the row itself
@@ -165,10 +165,13 @@ class UJSPortalScraper:
                 ]
                 X["court_summary_url"] = urls[-1]
                 X["docket_sheet_url"] = urls[-2]
-                out.append(X)
+
+                # Save it
+                data.append(X)
 
             # Return a Portal Results
-            out = PortalResults.from_dict({"data": out})
+            out = PortalResults.from_dict({"data": data})
+
         except NoSuchElementException:
             pass
 

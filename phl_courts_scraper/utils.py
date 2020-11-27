@@ -103,7 +103,7 @@ def groupby(words: List[Word], key: str, sort: bool = False) -> Iterator:
     return itertools.groupby(words, attrgetter(key))
 
 
-def find_nearest(array: Iterable, value: str) -> int:
+def find_nearest(array: Iterable, value: float) -> int:
     """Return the index of nearest match."""
     a = np.asarray(array)
     idx = (np.abs(a - value)).argmin()
