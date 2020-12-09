@@ -323,10 +323,6 @@ def _parse_header(words: List[Word], firstSectionTitle: str) -> dict:
         val = sorted(val, key=attrgetter("x"), reverse=True)  # sort by x
         info.append((key, val))
 
-    info = sorted(
-        info, key=lambda t: min(tt.y for tt in t[1])
-    )  # sort by min y
-
     out = {}
     row = info[1]
     out["date_of_birth"] = row[-1][0].text.split(":")[-1].strip()
