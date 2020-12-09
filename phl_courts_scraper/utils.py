@@ -6,7 +6,7 @@ import datetime
 import itertools
 import json
 from dataclasses import asdict, dataclass
-from operator import attrgetter, itemgetter
+from operator import attrgetter
 from pathlib import Path
 from typing import (
     Dict,
@@ -20,22 +20,108 @@ from typing import (
 )
 
 import desert
+import marshmallow
 import numpy as np
 import pandas as pd
 import pdfplumber
 from intervaltree import IntervalTree
 
+# Create a generic variable that can be 'Parent', or any subclass.
+Word_T = TypeVar("Word_T", bound="Word")
+
 
 @dataclass
 class Word:
-    """A word in the PDF, storing text and x/y coordinates."""
+    """
+    A word in the PDF with associated text and bounding box.
 
-    x: float
-    y: float
+    Parameters
+    ----------
+    x0 :
+        the starting horizontal coordinate
+    x1 :
+        the ending horizontal coordinate
+    bottom :
+        the bottom vertical coordinate
+    top :
+        the top vertical coordinate
+    text :
+        the associated text
+    """
+
+    x0: float
+    x1: float
+    top: float
+    bottom: float
     text: str
 
+    @property
+    def x(self) -> float:
+        """Alias for `x0`."""
+        return self.x0
 
-def get_pdf_words(pdf_path: str, x_tolerance: int = 5) -> List[Word]:
+    @property
+    def y(self) -> float:
+        """Alias for `tops`."""
+        return self.top
+
+    @classmethod
+    def from_dict(cls: Type[Word_T], data: dict) -> Word_T:
+        """
+        Return a new class instance from a dictionary
+        representation.
+
+        Parameters
+        ----------
+        data :
+            The dictionary representation of the class.
+        """
+        schema = desert.schema(cls, meta={"unknown": marshmallow.EXCLUDE})
+        return schema.load(data)
+
+
+def find_phrases(words: List[Word], *keywords: str) -> Optional[List[Word]]:
+    """
+    Find a list of consecutive words that match the input keywords.
+
+    Parameters
+    ----------
+    words :
+        the list of words to check
+    *keywords
+        one or more keywords representing the phrase to search for
+    """
+
+    # Make sure we have keywords
+    assert len(keywords) > 0
+
+    # Iterate through words and check
+    for i, w in enumerate(words):
+
+        # Matched the first word!
+        if w.text == keywords[0]:
+
+            # Did we match the rest
+            match = True
+            for j, keyword in enumerate(keywords[1:]):
+                if keyword != words[i + 1 + j].text:
+                    match = False
+
+            # Match!
+            if match:
+                return words[i : i + len(keywords)]
+
+    return None
+
+
+def get_pdf_words(
+    pdf_path: str,
+    x_tolerance: int = 5,
+    y_tolerance: int = 3,
+    footer_cutoff: int = 0,
+    header_cutoff: int = 0,
+    keep_blank_chars: bool = False,
+) -> List[Word]:
     """Parse a PDF and return the parsed words as well as x/y
     locations.
 
@@ -51,33 +137,44 @@ def get_pdf_words(pdf_path: str, x_tolerance: int = 5) -> List[Word]:
     words :
         a list of Word objects in the PDF
     """
-    FOOTER_CUTOFF = 640
-    out = []
-
     with pdfplumber.open(pdf_path) as pdf:
 
         # Loop over pages
+        offset = 0
+        words = []
         for i, pg in enumerate(pdf.pages):
 
             # Extract out words
-            words = pg.extract_words(
-                keep_blank_chars=True, x_tolerance=x_tolerance
-            )
-            words = [
-                word for word in words if float(word["top"]) < FOOTER_CUTOFF
-            ]
+            for word_dict in pg.extract_words(
+                keep_blank_chars=keep_blank_chars,
+                x_tolerance=x_tolerance,
+                y_tolerance=y_tolerance,
+            ):
 
-            # Texts
-            texts = [word["text"].strip() for word in words]
-            x0 = [float(word["x0"]) for word in words]
-            top = [float(word["top"]) + i * FOOTER_CUTOFF for word in words]
+                # Convert to a Word
+                word = Word.from_dict(word_dict)
 
-            # Sort
-            X = list(zip(x0, top, texts))
-            Y = sorted(X, key=itemgetter(1, 0), reverse=False)
-            out.append(Y)
+                # Check header and footer cutoffs
+                if word.bottom < footer_cutoff and word.top > header_cutoff:
 
-    return [Word(*tup) for pg in out for tup in pg]
+                    # Clean up text
+                    word.text = word.text.strip()
+
+                    # Add the offset
+                    word.top += offset
+                    word.bottom += offset
+
+                    # Save it
+                    words.append(word)
+
+            # Effective height of this page
+            effective_height = footer_cutoff - header_cutoff
+            offset += effective_height
+
+        # Sort the words top to bottom and left to right
+        words = sorted(words, key=attrgetter("top", "x0"), reverse=False)
+
+        return words
 
 
 def to_snake_case(d: dict, replace: List[str] = ["."]) -> dict:

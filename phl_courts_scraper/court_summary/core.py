@@ -326,19 +326,18 @@ def _parse_header(words: List[Word], firstSectionTitle: str) -> dict:
     info = sorted(
         info, key=lambda t: min(tt.y for tt in t[1])
     )  # sort by min y
-    info = info[2:]  # Drop info we don't need
 
     out = {}
-    row = info[0]
+    row = info[1]
     out["date_of_birth"] = row[-1][0].text.split(":")[-1].strip()
 
     # Get parameters that have format "Key: Value"
-    for w in info[1][-1]:
+    for w in info[2][-1]:
         key, value = w.text.split(":")
         out[key.strip().lower()] = value.strip().lower()
 
     # Finish up
-    row = info[2]
+    row = info[0]
     out["name"] = row[-1][0].text.strip()
     out["location"] = row[-1][1].text.strip()
     out["aliases"] = [w.text.strip() for w in row[-1][3:]]
@@ -559,7 +558,14 @@ class CourtSummaryParser:
         """Parse and return a court summary document."""
 
         # Parse PDF into a list of words
-        words = get_pdf_words(self.path)
+        words = get_pdf_words(
+            self.path,
+            keep_blank_chars=True,
+            x_tolerance=5,
+            y_tolerance=0,
+            header_cutoff=60,
+            footer_cutoff=645,
+        )
 
         # Define the section headers
         headers = [
