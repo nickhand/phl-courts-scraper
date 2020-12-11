@@ -19,7 +19,7 @@ def _test_report(report):
     assert all(col in cols for col in report.columns)
 
 
-def test_court_summary_1():
+def test_docket_sheet_1():
     """Test example #1 of docket sheet report."""
 
     # Initialize
@@ -28,10 +28,19 @@ def test_court_summary_1():
     _test_report(report)
 
 
-def test_court_summary_2():
+def test_docket_sheet_2():
     """Test example #2 of docket sheet report."""
 
     # Initialize
     parser = DocketSheetParser(current_dir / "data" / "DocketSheetReport2.pdf")
+    report = parser()
+    _test_report(report)
+
+
+def test_docket_sheet_3():
+    """Test example #3 of docket sheet report."""
+
+    # Initialize
+    parser = DocketSheetParser(current_dir / "data" / "DocketSheetReport3.pdf")
     report = parser()
     _test_report(report)

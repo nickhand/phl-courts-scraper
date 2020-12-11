@@ -12,7 +12,7 @@ def _parse(
     words: List[Word],
     pg: pdfplumber.page.Page,
     start_keyword: str,
-    end_keyword: str,
+    end_keywords: List[str],
     keep_blank_chars: bool = True,
     min_words_vertical: int = 0,
 ) -> Optional[pd.DataFrame]:
@@ -27,7 +27,12 @@ def _parse(
         start_y = start_match[0].top
 
         # Look for the place to stop
-        stop_match = find_phrases(words, *end_keyword.split())
+        stop_match = None
+        for end_keyword in end_keywords:
+            stop_match = find_phrases(words, *end_keyword.split())
+            if stop_match:
+                break
+
         if not stop_match:
             raise ValueError("Could not identify end of section")
         stop_y = stop_match[0].top
@@ -56,7 +61,7 @@ def _parse(
             columns=dict(zip(df.columns, df.loc[0].fillna(df.loc[1]).tolist()))
         )
 
-        return df
+        return df.reset_index(drop=True)
 
     return None
 
@@ -81,7 +86,7 @@ class DocketSheetParser:
             raise ValueError(f"Allowed sections to parse: {allowed_sections}")
 
         start_keywords = {"bail": "Bail Action"}
-        stop_keywords = {"bail": "CHARGES"}
+        stop_keywords = {"bail": ["CHARGES", "CPCMS"]}
 
         # Open the PDF
         out = None
