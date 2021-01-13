@@ -318,8 +318,12 @@ def _parse_header(words: List[Word], firstSectionTitle: str) -> dict:
     # Get the line number containing "Active"
     i = _find_line_number(words, firstSectionTitle)
 
+    # Remove any page header, e.g., FJD and Court Summary
+    bad = ["Court Summary", "First Judicial District of Pennsylvania"]
+    header_words = [w for w in words[:i] if w.text not in bad]
+
     info = []
-    for key, val in groupby(words[:i], "x", sort=True):
+    for key, val in groupby(header_words, "x", sort=True):
         val = sorted(val, key=attrgetter("x"), reverse=True)  # sort by x
         info.append((key, val))
 
@@ -487,6 +491,7 @@ def _yield_dockets(
 
             if pg + i < len(dockets) - 1:
                 w = dockets[pg + i]
+
                 if (
                     w.text
                     in [
@@ -559,7 +564,7 @@ class CourtSummaryParser:
             keep_blank_chars=True,
             x_tolerance=5,
             y_tolerance=0,
-            header_cutoff=60,
+            header_cutoff=0,
             footer_cutoff=645,
         )
 
