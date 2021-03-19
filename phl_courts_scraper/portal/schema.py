@@ -29,15 +29,17 @@ class PortalResult(DataclassSchema):
     """
 
     docket_number: str
+    court_type: str
     short_caption: str
-    filing_date: str
-    county: str
-    party: str
     case_status: str
+    filing_date: str
+    party: str
+    date_of_birth: str
+    county: str
+    court_office: str
     otn: str
     lotn: str
     dc_number: str
-    date_of_birth: str
     docket_sheet_url: str
     court_summary_url: str
 

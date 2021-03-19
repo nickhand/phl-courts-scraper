@@ -17,25 +17,7 @@ from .schema import PortalResults
 __all__ = ["UJSPortalScraper"]
 
 # The URL of the portal
-PORTAL_URL = "https://ujsportal.pacourts.us/DocketSheets/MC.aspx"
-
-
-def _any_of(*expected_conditions: Callable) -> Callable[[object], bool]:
-    """An expectation that any of multiple expected conditions is true.
-    Equivalent to a logical 'OR'.
-    Returns results of the first matching condition, or False if none do."""
-
-    def any_of_condition(driver: WebDriver) -> bool:
-        for expected_condition in expected_conditions:
-            try:
-                result = expected_condition(driver)
-                if result:
-                    return result
-            except WebDriverException:
-                pass
-        return False
-
-    return any_of_condition
+PORTAL_URL = "https://ujsportal.pacourts.us/CaseSearch"
 
 
 @dataclass
@@ -60,10 +42,10 @@ class UJSPortalScraper:
         self.driver.get(self.url)
 
         # select the search by dropdown element
-        SEARCH_BY_DROPDOWN = "ctl00_ctl00_ctl00_cphMain_cphDynamicContent_cphDynamicContent_searchTypeListControl"
+        SEARCH_BY_DROPDOWN = "SearchBy-Control"
         input_searchtype = Select(
-            self.driver.find_element_by_xpath(
-                f'//*[@id="{SEARCH_BY_DROPDOWN}"]'
+            self.driver.find_element_by_css_selector(
+                f"#{SEARCH_BY_DROPDOWN} > select"
             )
         )
 
@@ -90,9 +72,9 @@ class UJSPortalScraper:
         """
 
         # Get the input element for the DC number
-        INPUT_DC_NUMBER = "ctl00_ctl00_ctl00_cphMain_cphDynamicContent_cphDynamicContent_policeIncidentNumberCriteriaControl_policeIncidentNumberControl"
-        input_dc_number = self.driver.find_element_by_xpath(
-            f'//*[@id="{INPUT_DC_NUMBER}"]'
+        INPUT_DC_NUMBER = "PoliceIncidentComplaint-Control"
+        input_dc_number = self.driver.find_element_by_css_selector(
+            f"#{INPUT_DC_NUMBER} > input"
         )
 
         # Clear and add our desired DC number
@@ -100,52 +82,46 @@ class UJSPortalScraper:
         input_dc_number.send_keys(str(dc_number))
 
         # Submit the search
-        SEARCH_BUTTON = "ctl00_ctl00_ctl00_cphMain_cphDynamicContent_cphDynamicContent_policeIncidentNumberCriteriaControl_searchCommandControl"
-        self.driver.find_element_by_xpath(
-            f'//*[@id="{SEARCH_BUTTON}"]'
-        ).click()
+        SEARCH_BUTTON = "btnSearch"
+        self.driver.find_element_by_css_selector(f"#{SEARCH_BUTTON}").click()
 
         # Results / no results elements
-        RESULTS_CONTAINER = "ctl00_ctl00_ctl00_cphMain_cphDynamicContent_cphDynamicContent_policeIncidentNumberCriteriaControl_searchResultsGridControl_resultsPanel"
-        NO_RESULTS_CONTAINER = "ctl00_ctl00_ctl00_cphMain_cphDynamicContent_cphDynamicContent_policeIncidentNumberCriteriaControl_searchResultsGridControl_noResultsPanel"
+        RESULTS_CONTAINER = "caseSearchResultGrid"
 
         # Wait explicitly until search results load
         WebDriverWait(self.driver, 120).until(
-            _any_of(
-                EC.visibility_of_element_located(
-                    (By.CSS_SELECTOR, f"#{RESULTS_CONTAINER}")
-                ),
-                EC.visibility_of_element_located(
-                    (By.CSS_SELECTOR, f"#{NO_RESULTS_CONTAINER}")
-                ),
-            )
+            EC.visibility_of_element_located(
+                (By.CSS_SELECTOR, f"#{RESULTS_CONTAINER}")
+            ),
         )
 
         # if results succeeded, parse them
         out = None
         try:
             # Table holding the search results
-            results_table = self.driver.find_element_by_xpath(
-                f'//*[@id="{RESULTS_CONTAINER}"]/table'
+            results_table = self.driver.find_element_by_css_selector(
+                f"#{RESULTS_CONTAINER}"
             )
 
             # The rows of the search page
             results_rows = results_table.find_elements_by_css_selector(
-                "tbody > tr.gridViewRow"
+                "tbody > tr"
             )
 
             # result fields
             fields = [
                 "docket_number",
+                "court_type",
                 "short_caption",
-                "filing_date",
-                "county",
-                "party",
                 "case_status",
+                "filing_date",
+                "party",
+                "date_of_birth",
+                "county",
+                "court_office",
                 "otn",
                 "lotn",
                 "dc_number",
-                "date_of_birth",
             ]
 
             # extract data for each row, including links
@@ -154,9 +130,19 @@ class UJSPortalScraper:
 
                 # the data displayed in the row itself
                 texts = [
-                    aa.text for aa in row.find_elements_by_css_selector("td")
+                    aa.text
+                    for aa in row.find_elements_by_css_selector("td")
+                    if aa.get_attribute("class") != "display-none"
                 ]
-                X = dict(zip(fields, texts[-len(fields) :]))
+
+                # No text? Skip!
+                if not len(texts):
+                    continue
+
+                # Make sure we check the length
+                # Last td cell is unnecessary — it holds the urls (added below)
+                assert len(texts) == len(fields) + 1
+                X = dict(zip(fields, texts[:-1]))
 
                 # the urls to the court summary and docket sheet
                 urls = [

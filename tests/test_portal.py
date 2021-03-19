@@ -36,5 +36,5 @@ def test_scrape_failure(scraper):
     """Test scraping failure."""
 
     # Fail with bad dc number
-    data = scraper("17")
-    assert data is None
+    data = scraper("172508823")
+    assert len(data) == 0
