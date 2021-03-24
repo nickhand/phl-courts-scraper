@@ -36,5 +36,6 @@ setup(
         "intervaltree",
         "pdfplumber",
         "desert",
+        "tryagain",
     ],
 )
