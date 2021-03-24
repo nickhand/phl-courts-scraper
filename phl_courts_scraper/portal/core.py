@@ -11,6 +11,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
+from tryagain import retries
 
 from .schema import PortalResults
 
@@ -54,6 +55,7 @@ class UJSPortalScraper:
             "Police Incident/Complaint Number"
         )
 
+    @retries(max_attempts=3)
     def __call__(self, dc_number: str) -> Optional[PortalResults]:
         """
         Given an input DC number for a police incident, return
@@ -89,7 +91,7 @@ class UJSPortalScraper:
         RESULTS_CONTAINER = "caseSearchResultGrid"
 
         # Wait explicitly until search results load
-        WebDriverWait(self.driver, 120).until(
+        WebDriverWait(self.driver, 20).until(
             EC.visibility_of_element_located(
                 (By.CSS_SELECTOR, f"#{RESULTS_CONTAINER}")
             ),
