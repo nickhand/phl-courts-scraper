@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 from typing import Callable, List, Optional
 
-import tryagain
 from selenium.common.exceptions import (
     NoSuchElementException,
     WebDriverException,
@@ -12,6 +11,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
+from tryagain import retries
 
 from .schema import PortalResults
 
@@ -76,7 +76,12 @@ class UJSPortalScraper:
             docket number
         """
 
-        def _call(dc_number):
+        @retries(
+            max_attempts=3,
+            cleanup_hook=lambda: print("Scraping call failed"),
+            pre_retry_hook=self._prep_url,
+        )
+        def _call():
 
             # Get the input element for the DC number
             INPUT_DC_NUMBER = "PoliceIncidentComplaint-Control"
@@ -172,12 +177,4 @@ class UJSPortalScraper:
 
             return out
 
-        # Get a wrapped callable
-        safe_callable = tryagain.call(
-            _call,
-            max_attempts=3,
-            cleanup_hook=lambda: print("Scraping call failed"),
-            pre_retry_hook=self._prep_url,
-        )
-
-        return safe_callable(dc_number)
+        return _call()
