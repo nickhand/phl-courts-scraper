@@ -172,9 +172,12 @@ class UJSPortalScraper:
 
             return out
 
-        return tryagain.call(
+        # Get a wrapped callable
+        safe_callable = tryagain.call(
             _call,
             max_attempts=3,
             cleanup_hook=lambda: print("Scraping call failed"),
             pre_retry_hook=self._prep_url,
         )
+
+        return safe_callable(dc_number)
