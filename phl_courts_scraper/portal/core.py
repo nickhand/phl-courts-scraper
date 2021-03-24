@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from typing import Callable, List, Optional
 
+import tryagain
 from selenium.common.exceptions import (
     NoSuchElementException,
     WebDriverException,
@@ -11,7 +12,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
-from tryagain import retries
 
 from .schema import PortalResults
 
@@ -38,6 +38,10 @@ class UJSPortalScraper:
 
     def __post_init__(self):
         """Prepare the web scraper to scrape by incident number."""
+        self._prep_url()
+
+    def _prep_url(self):
+        """Prep the URL for scraping."""
 
         # navigate to the portal URL
         self.driver.get(self.url)
@@ -55,7 +59,6 @@ class UJSPortalScraper:
             "Police Incident/Complaint Number"
         )
 
-    @retries(max_attempts=3)
     def __call__(self, dc_number: str) -> Optional[PortalResults]:
         """
         Given an input DC number for a police incident, return
@@ -73,94 +76,105 @@ class UJSPortalScraper:
             docket number
         """
 
-        # Get the input element for the DC number
-        INPUT_DC_NUMBER = "PoliceIncidentComplaint-Control"
-        input_dc_number = self.driver.find_element_by_css_selector(
-            f"#{INPUT_DC_NUMBER} > input"
-        )
+        def _call(dc_number):
 
-        # Clear and add our desired DC number
-        input_dc_number.clear()
-        input_dc_number.send_keys(str(dc_number))
-
-        # Submit the search
-        SEARCH_BUTTON = "btnSearch"
-        self.driver.find_element_by_css_selector(f"#{SEARCH_BUTTON}").click()
-
-        # Results / no results elements
-        RESULTS_CONTAINER = "caseSearchResultGrid"
-
-        # Wait explicitly until search results load
-        WebDriverWait(self.driver, 20).until(
-            EC.visibility_of_element_located(
-                (By.CSS_SELECTOR, f"#{RESULTS_CONTAINER}")
-            ),
-        )
-
-        # if results succeeded, parse them
-        out = None
-        try:
-            # Table holding the search results
-            results_table = self.driver.find_element_by_css_selector(
-                f"#{RESULTS_CONTAINER}"
+            # Get the input element for the DC number
+            INPUT_DC_NUMBER = "PoliceIncidentComplaint-Control"
+            input_dc_number = self.driver.find_element_by_css_selector(
+                f"#{INPUT_DC_NUMBER} > input"
             )
 
-            # The rows of the search page
-            results_rows = results_table.find_elements_by_css_selector(
-                "tbody > tr"
+            # Clear and add our desired DC number
+            input_dc_number.clear()
+            input_dc_number.send_keys(str(dc_number))
+
+            # Submit the search
+            SEARCH_BUTTON = "btnSearch"
+            self.driver.find_element_by_css_selector(
+                f"#{SEARCH_BUTTON}"
+            ).click()
+
+            # Results / no results elements
+            RESULTS_CONTAINER = "caseSearchResultGrid"
+
+            # Wait explicitly until search results load
+            WebDriverWait(self.driver, 20).until(
+                EC.visibility_of_element_located(
+                    (By.CSS_SELECTOR, f"#{RESULTS_CONTAINER}")
+                ),
             )
 
-            # result fields
-            fields = [
-                "docket_number",
-                "court_type",
-                "short_caption",
-                "case_status",
-                "filing_date",
-                "party",
-                "date_of_birth",
-                "county",
-                "court_office",
-                "otn",
-                "lotn",
-                "dc_number",
-            ]
+            # if results succeeded, parse them
+            out = None
+            try:
+                # Table holding the search results
+                results_table = self.driver.find_element_by_css_selector(
+                    f"#{RESULTS_CONTAINER}"
+                )
 
-            # extract data for each row, including links
-            data = []
-            for row in results_rows:
+                # The rows of the search page
+                results_rows = results_table.find_elements_by_css_selector(
+                    "tbody > tr"
+                )
 
-                # the data displayed in the row itself
-                texts = [
-                    aa.text
-                    for aa in row.find_elements_by_css_selector("td")
-                    if aa.get_attribute("class") != "display-none"
+                # result fields
+                fields = [
+                    "docket_number",
+                    "court_type",
+                    "short_caption",
+                    "case_status",
+                    "filing_date",
+                    "party",
+                    "date_of_birth",
+                    "county",
+                    "court_office",
+                    "otn",
+                    "lotn",
+                    "dc_number",
                 ]
 
-                # No text? Skip!
-                if not len(texts):
-                    continue
+                # extract data for each row, including links
+                data = []
+                for row in results_rows:
 
-                # Make sure we check the length
-                # Last td cell is unnecessary — it holds the urls (added below)
-                assert len(texts) == len(fields) + 1
-                X = dict(zip(fields, texts[:-1]))
+                    # the data displayed in the row itself
+                    texts = [
+                        aa.text
+                        for aa in row.find_elements_by_css_selector("td")
+                        if aa.get_attribute("class") != "display-none"
+                    ]
 
-                # the urls to the court summary and docket sheet
-                urls = [
-                    a.get_attribute("href")
-                    for a in row.find_elements_by_css_selector("a")
-                ]
-                X["court_summary_url"] = urls[-1]
-                X["docket_sheet_url"] = urls[-2]
+                    # No text? Skip!
+                    if not len(texts):
+                        continue
 
-                # Save it
-                data.append(X)
+                    # Make sure we check the length
+                    # Last td cell is unnecessary — it holds the urls (added below)
+                    assert len(texts) == len(fields) + 1
+                    X = dict(zip(fields, texts[:-1]))
 
-            # Return a Portal Results
-            out = PortalResults.from_dict({"data": data})
+                    # the urls to the court summary and docket sheet
+                    urls = [
+                        a.get_attribute("href")
+                        for a in row.find_elements_by_css_selector("a")
+                    ]
+                    X["court_summary_url"] = urls[-1]
+                    X["docket_sheet_url"] = urls[-2]
 
-        except NoSuchElementException:
-            pass
+                    # Save it
+                    data.append(X)
 
-        return out
+                # Return a Portal Results
+                out = PortalResults.from_dict({"data": data})
+
+            except NoSuchElementException:
+                pass
+
+            return out
+
+        return tryagain.call(
+            _call,
+            max_attempts=3,
+            cleanup_hook=lambda: print("Scraping call failed"),
+            pre_retry_hook=self._prep_url,
+        )
