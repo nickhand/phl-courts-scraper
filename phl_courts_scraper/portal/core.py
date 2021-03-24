@@ -44,6 +44,7 @@ class UJSPortalScraper:
         """Prep the URL for scraping."""
 
         # navigate to the portal URL
+        print("Getting URL")
         self.driver.get(self.url)
 
         # select the search by dropdown element
@@ -58,6 +59,7 @@ class UJSPortalScraper:
         input_searchtype.select_by_visible_text(
             "Police Incident/Complaint Number"
         )
+        print("DONE")
 
     def __call__(self, dc_number: str) -> Optional[PortalResults]:
         """
