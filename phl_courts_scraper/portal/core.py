@@ -45,7 +45,6 @@ class UJSPortalScraper:
         """Prep the URL for scraping."""
 
         # navigate to the portal URL
-        print("Getting URL")
         self.driver.get(self.url)
 
         # select the search by dropdown element
@@ -60,7 +59,6 @@ class UJSPortalScraper:
         input_searchtype.select_by_visible_text(
             "Police Incident/Complaint Number"
         )
-        print("DONE")
 
     def __call__(
         self, dc_number: str, max_sleep=120, min_sleep=30
@@ -83,7 +81,6 @@ class UJSPortalScraper:
 
         @retries(
             max_attempts=50,
-            cleanup_hook=lambda: print("Scraping call failed"),
             pre_retry_hook=self._prep_url,
             wait=lambda n: min(
                 min_sleep + 2 ** n + random.random(), max_sleep
