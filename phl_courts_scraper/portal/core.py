@@ -1,5 +1,6 @@
 """Scrape data from the PA Unified Judicial System portal."""
 
+import random
 from dataclasses import dataclass
 from typing import Callable, List, Optional
 
@@ -61,7 +62,9 @@ class UJSPortalScraper:
         )
         print("DONE")
 
-    def __call__(self, dc_number: str) -> Optional[PortalResults]:
+    def __call__(
+        self, dc_number: str, max_sleep=120
+    ) -> Optional[PortalResults]:
         """
         Given an input DC number for a police incident, return
         the relevant details from the courts portal.
@@ -79,9 +82,10 @@ class UJSPortalScraper:
         """
 
         @retries(
-            max_attempts=3,
+            max_attempts=50,
             cleanup_hook=lambda: print("Scraping call failed"),
             pre_retry_hook=self._prep_url,
+            wait=lambda n: min(2 ** n + random.random(), max_sleep),
         )
         def _call():
 
