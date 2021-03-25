@@ -4,6 +4,7 @@ import random
 from dataclasses import dataclass
 from typing import Callable, List, Optional
 
+from loguru import logger
 from selenium.common.exceptions import (
     NoSuchElementException,
     WebDriverException,
@@ -81,6 +82,7 @@ class UJSPortalScraper:
 
         @retries(
             max_attempts=50,
+            cleanup_hook=lambda: logger.info("Retrying..."),
             pre_retry_hook=self._prep_url,
             wait=lambda n: min(
                 min_sleep + 2 ** n + random.random(), max_sleep

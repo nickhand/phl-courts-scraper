@@ -37,5 +37,6 @@ setup(
         "pdfplumber",
         "desert",
         "tryagain",
+        "loguru",
     ],
 )
