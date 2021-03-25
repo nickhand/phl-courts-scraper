@@ -63,7 +63,7 @@ class UJSPortalScraper:
         print("DONE")
 
     def __call__(
-        self, dc_number: str, max_sleep=120
+        self, dc_number: str, max_sleep=120, min_sleep=30
     ) -> Optional[PortalResults]:
         """
         Given an input DC number for a police incident, return
@@ -85,7 +85,9 @@ class UJSPortalScraper:
             max_attempts=50,
             cleanup_hook=lambda: print("Scraping call failed"),
             pre_retry_hook=self._prep_url,
-            wait=lambda n: min(2 ** n + random.random(), max_sleep),
+            wait=lambda n: min(
+                min_sleep + 2 ** n + random.random(), max_sleep
+            ),
         )
         def _call():
 
@@ -109,7 +111,7 @@ class UJSPortalScraper:
             RESULTS_CONTAINER = "caseSearchResultGrid"
 
             # Wait explicitly until search results load
-            WebDriverWait(self.driver, 20).until(
+            WebDriverWait(self.driver, 10).until(
                 EC.visibility_of_element_located(
                     (By.CSS_SELECTOR, f"#{RESULTS_CONTAINER}")
                 ),
