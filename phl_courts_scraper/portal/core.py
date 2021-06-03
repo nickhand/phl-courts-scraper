@@ -40,15 +40,13 @@ class UJSPortalScraper:
 
     def __post_init__(self):
         """Prepare the web scraper to scrape by incident number."""
-
-        # navigate to the portal URL
-        self.driver.get(self.url)
-
-        # Prep URL
         self._prep_url()
 
     def _prep_url(self):
         """Prep the URL for scraping."""
+
+        # navigate to the portal URL
+        self.driver.get(self.url)
 
         # select the search by dropdown element
         SEARCH_BY_DROPDOWN = "SearchBy-Control"
@@ -62,7 +60,7 @@ class UJSPortalScraper:
         input_searchtype.select_by_visible_text("Incident Number")
 
     def __call__(
-        self, dc_number: str, max_sleep=120, min_sleep=30
+        self, dc_number: str, max_sleep=60, min_sleep=5
     ) -> Optional[PortalResults]:
         """
         Given an input DC number for a police incident, return
@@ -80,19 +78,10 @@ class UJSPortalScraper:
             docket number
         """
 
-        def retry_hook():
-            logger.info("Refreshing!")
-            self.driver.refresh()
-            logger.info("   Done refreshing!")
-
-            logger.info("Prepping URL...")
-            self._prep_url()
-            logger.info("...done")
-
         @retries(
-            max_attempts=10,
+            max_attempts=5,
             cleanup_hook=lambda: logger.info("Retrying..."),
-            pre_retry_hook=retry_hook,
+            pre_retry_hook=self._prep_url,
             wait=lambda n: min(
                 min_sleep + 2 ** n + random.random(), max_sleep
             ),
