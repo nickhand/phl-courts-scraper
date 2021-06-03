@@ -89,14 +89,14 @@ class UJSPortalScraper:
             self._prep_url()
             logger.info("...done")
 
-        # @retries(
-        #     max_attempts=10,
-        #     cleanup_hook=lambda: logger.info("Retrying..."),
-        #     pre_retry_hook=retry_hook,
-        #     wait=lambda n: min(
-        #         min_sleep + 2 ** n + random.random(), max_sleep
-        #     ),
-        # )
+        @retries(
+            max_attempts=10,
+            cleanup_hook=lambda: logger.info("Retrying..."),
+            pre_retry_hook=retry_hook,
+            wait=lambda n: min(
+                min_sleep + 2 ** n + random.random(), max_sleep
+            ),
+        )
         def _call():
 
             # Get the input element for the DC number
