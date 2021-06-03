@@ -44,6 +44,9 @@ class UJSPortalScraper:
         # navigate to the portal URL
         self.driver.get(self.url)
 
+        # Prep URL
+        self._prep_url()
+
     def _prep_url(self):
         """Prep the URL for scraping."""
 
