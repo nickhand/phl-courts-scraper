@@ -78,14 +78,14 @@ class UJSPortalScraper:
             docket number
         """
 
-        # @retries(
-        #     max_attempts=50,
-        #     cleanup_hook=lambda: logger.info("Retrying..."),
-        #     pre_retry_hook=self._prep_url,
-        #     wait=lambda n: min(
-        #         min_sleep + 2 ** n + random.random(), max_sleep
-        #     ),
-        # )
+        @retries(
+            max_attempts=10,
+            cleanup_hook=lambda: logger.info("Retrying..."),
+            pre_retry_hook=self._prep_url,
+            wait=lambda n: min(
+                min_sleep + 2 ** n + random.random(), max_sleep
+            ),
+        )
         def _call():
 
             # Get the input element for the DC number
