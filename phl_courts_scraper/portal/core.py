@@ -57,9 +57,7 @@ class UJSPortalScraper:
         )
 
         # Search by police incident
-        input_searchtype.select_by_visible_text(
-            "Police Incident/Complaint Number"
-        )
+        input_searchtype.select_by_visible_text("Incident Number")
 
     def __call__(
         self, dc_number: str, max_sleep=120, min_sleep=30
@@ -91,7 +89,7 @@ class UJSPortalScraper:
         def _call():
 
             # Get the input element for the DC number
-            INPUT_DC_NUMBER = "PoliceIncidentComplaint-Control"
+            INPUT_DC_NUMBER = "IncidentNumber-Control"
             input_dc_number = self.driver.find_element_by_css_selector(
                 f"#{INPUT_DC_NUMBER} > input"
             )
