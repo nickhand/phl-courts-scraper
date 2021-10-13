@@ -1,14 +1,25 @@
 """Scrape data from the PA Unified Judicial System portal."""
 
+import random
+import time
 from dataclasses import dataclass
 from typing import Optional
 
 from bs4 import BeautifulSoup
+from loguru import logger
+
+# Selenium imports
+from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
+from tryagain import retries
+
+# Webdriver
+from webdriver_manager.chrome import ChromeDriverManager
+from webdriver_manager.firefox import GeckoDriverManager
 
 from .schema import PortalResults
 
@@ -18,30 +29,61 @@ __all__ = ["UJSPortalScraper"]
 PORTAL_URL = "https://ujsportal.pacourts.us/CaseSearch"
 
 
+def get_webdriver(browser, debug=False):
+
+    # Google chrome
+    if browser == "chrome":
+        options = webdriver.ChromeOptions()
+        options.add_argument("--no-sandbox")
+        if not debug:
+            options.add_argument("--headless")
+
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=options)
+
+    # Firefox
+    elif browser == "firefox":
+        options = webdriver.FirefoxOptions()
+        if not debug:
+            options.add_argument("--headless")
+
+        service = Service(GeckoDriverManager().install())
+        driver = webdriver.Firefox(service=service, options=options)
+    else:
+        raise ValueError("Unknown browser type, should be 'chrome' or 'firefox'")
+
+    return driver
+
+
 @dataclass
 class UJSPortalScraper:
     """Scrape the UJS courts portal by incident number.
 
     Parameters
     ----------
-    driver :
-        the selenium web driver that runs the scraping
-    url :
-        the url to scrape; default is the municipal courts UJS portal
+    browser :
+        either 'firefox' or 'chrome'
+    debug :
+        If debug mode, do not use headless driver
+    sleep :
+        seconds to sleep between requests
+    log_freq :
+        log to screen ever N requests
     """
 
-    driver: WebDriver
-    url: str = PORTAL_URL
+    browser: str = "chrome"
+    debug: bool = False
+    sleep: int = 7
+    log_freq: int = 50
 
-    def __post_init__(self):
-        """Prepare the web scraper to scrape by incident number."""
-        self._prep_url()
+    def _init(self):
+        """Initialization function."""
 
-    def _prep_url(self):
-        """Prep the URL for scraping."""
+        # Get the driver
+        self.driver = get_webdriver(self.browser, debug=self.debug)
 
-        # navigate to the portal URL
-        self.driver.get(self.url)
+        # Navigate to the portal URL
+        self.driver.get(PORTAL_URL)
 
         # select the search by dropdown element
         SEARCH_BY_DROPDOWN = "SearchBy-Control"
@@ -52,9 +94,71 @@ class UJSPortalScraper:
         # Search by police incident
         input_searchtype.select_by_visible_text("Incident Number")
 
-    def __call__(
-        self, dc_number: str, max_sleep=60, min_sleep=5
-    ) -> Optional[PortalResults]:
+    def scrape_incident_data(
+        self,
+        incident_numbers,
+        sleep=7,
+        min_sleep=30,
+        max_sleep=120,
+    ):
+        """Scrape the courts portal for the data associated with the input incident numbers."""
+
+        # Initialize if we need to
+        if not hasattr(self, "driver"):
+            self._init()
+
+        # Log the number
+        N = len(incident_numbers)
+        logger.info(f"Scraping info for {N} incidents")
+
+        # Save new results here
+        results = {}
+
+        def cleanup():
+            self.driver.close()
+            logger.info("Retrying...")
+
+        @retries(
+            max_attempts=15,
+            cleanup_hook=cleanup,
+            pre_retry_hook=self._init,
+            wait=lambda n: min(min_sleep + 2 ** n + random.random(), max_sleep),
+        )
+        def _call(i):
+
+            if i % self.log_freq == 0:
+                logger.debug(i)
+            dc_key = str(incident_numbers[i])
+
+            # Some DC keys for OIS are shorter
+            if len(dc_key) == 12:
+
+                # Scrape!
+                scraping_result = self(dc_key[2:])
+
+                # Get the list of results
+                scraping_result = scraping_result.to_dict()["data"]
+
+                # Save results
+                results[dc_key] = scraping_result  # Could be empty list
+
+                # Sleep!
+                time.sleep(sleep)
+
+        # Loop over shootings and scrape
+        try:
+            for i in range(N):
+                _call(i)
+        except:
+            logger.exception(
+                f"Exception raised; i = {i} & last incident number = {incident_numbers[i]}"
+            )
+        finally:
+            logger.debug(f"Done scraping: {i+1} DC keys scraped")
+
+        return results
+
+    def __call__(self, dc_number: str) -> Optional[PortalResults]:
         """
         Given an input DC number for a police incident, return
         the relevant details from the courts portal.
@@ -70,96 +174,91 @@ class UJSPortalScraper:
             A PortalResults holding details for each unique
             docket number
         """
+        # Get the input element for the DC number
+        INPUT_DC_NUMBER = "IncidentNumber-Control"
+        input_dc_number = self.driver.find_element(
+            By.CSS_SELECTOR, f"#{INPUT_DC_NUMBER} > input"
+        )
 
-        def _call():
+        # Clear and add our desired DC number
+        input_dc_number.clear()
+        input_dc_number.send_keys(str(dc_number))
 
-            # Get the input element for the DC number
-            INPUT_DC_NUMBER = "IncidentNumber-Control"
-            input_dc_number = self.driver.find_element(
-                By.CSS_SELECTOR, f"#{INPUT_DC_NUMBER} > input"
-            )
+        # Submit the search
+        SEARCH_BUTTON = "btnSearch"
+        self.driver.find_element(By.CSS_SELECTOR, f"#{SEARCH_BUTTON}").click()
 
-            # Clear and add our desired DC number
-            input_dc_number.clear()
-            input_dc_number.send_keys(str(dc_number))
+        # Results / no results elements
+        RESULTS_CONTAINER = "caseSearchResultGrid"
 
-            # Submit the search
-            SEARCH_BUTTON = "btnSearch"
-            self.driver.find_element(By.CSS_SELECTOR, f"#{SEARCH_BUTTON}").click()
+        # Wait explicitly until search results load
+        WebDriverWait(self.driver, 10).until(
+            EC.visibility_of_element_located(
+                (By.CSS_SELECTOR, f"#{RESULTS_CONTAINER}")
+            ),
+        )
 
-            # Results / no results elements
-            RESULTS_CONTAINER = "caseSearchResultGrid"
+        # Initialize the soup
+        soup = BeautifulSoup(self.driver.page_source, "html.parser")
 
-            # Wait explicitly until search results load
-            WebDriverWait(self.driver, 10).until(
-                EC.visibility_of_element_located(
-                    (By.CSS_SELECTOR, f"#{RESULTS_CONTAINER}")
-                ),
-            )
+        # if results succeeded, parse them
+        out = None
+        try:
 
-            # Initialize the soup
-            soup = BeautifulSoup(self.driver.page_source, "html.parser")
+            # Table holding the search results
+            results_table = soup.select_one(f"#{RESULTS_CONTAINER}")
 
-            # if results succeeded, parse them
-            out = None
-            try:
+            # The rows of the search page
+            results_rows = results_table.select("tbody > tr")
 
-                # Table holding the search results
-                results_table = soup.select_one(f"#{RESULTS_CONTAINER}")
+            # result fields
+            fields = [
+                "docket_number",
+                "court_type",
+                "short_caption",
+                "case_status",
+                "filing_date",
+                "party",
+                "date_of_birth",
+                "county",
+                "court_office",
+                "otn",
+                "lotn",
+                "dc_number",
+            ]
 
-                # The rows of the search page
-                results_rows = results_table.select("tbody > tr")
+            # extract data for each row, including links
+            data = []
+            for row in results_rows:
 
-                # result fields
-                fields = [
-                    "docket_number",
-                    "court_type",
-                    "short_caption",
-                    "case_status",
-                    "filing_date",
-                    "party",
-                    "date_of_birth",
-                    "county",
-                    "court_office",
-                    "otn",
-                    "lotn",
-                    "dc_number",
+                # the data displayed in the row itself
+                texts = [
+                    td.text
+                    for td in row.select("td")
+                    if "display-none" not in td.attrs.get("class", [])
                 ]
 
-                # extract data for each row, including links
-                data = []
-                for row in results_rows:
+                # No text? Skip!
+                if not len(texts):
+                    continue
 
-                    # the data displayed in the row itself
-                    texts = [
-                        td.text
-                        for td in row.select("td")
-                        if "display-none" not in td.attrs.get("class", [])
-                    ]
+                # Make sure we check the length
+                # Last td cell is unnecessary — it holds the urls (added below)
+                assert len(texts) == len(fields) + 1
+                X = dict(zip(fields, texts[:-1]))
 
-                    # No text? Skip!
-                    if not len(texts):
-                        continue
+                # the urls to the court summary and docket sheet
+                urls = [a.attrs["href"] for a in row.select("a")]
+                X["court_summary_url"] = urls[-1]
+                X["docket_sheet_url"] = urls[-2]
 
-                    # Make sure we check the length
-                    # Last td cell is unnecessary — it holds the urls (added below)
-                    assert len(texts) == len(fields) + 1
-                    X = dict(zip(fields, texts[:-1]))
+                # Save it
+                data.append(X)
 
-                    # the urls to the court summary and docket sheet
-                    urls = [a.attrs["href"] for a in row.select("a")]
-                    X["court_summary_url"] = urls[-1]
-                    X["docket_sheet_url"] = urls[-2]
+            # Return a Portal Results
+            out = PortalResults.from_dict({"data": data})
 
-                    # Save it
-                    data.append(X)
+        except NoSuchElementException:
+            pass
 
-                # Return a Portal Results
-                out = PortalResults.from_dict({"data": data})
-
-            except NoSuchElementException:
-                pass
-
-            return out
-
-        return _call()
+        return out
