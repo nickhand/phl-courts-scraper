@@ -73,8 +73,10 @@ class UJSPortalScraper:
 
     browser: str = "chrome"
     debug: bool = False
-    sleep: int = 7
     log_freq: int = 50
+    min_sleep: int = 30
+    max_sleep: int = 120
+    sleep: int = 7
 
     def _init(self):
         """Initialization function."""
@@ -97,9 +99,6 @@ class UJSPortalScraper:
     def scrape_incident_data(
         self,
         incident_numbers,
-        sleep=7,
-        min_sleep=30,
-        max_sleep=120,
     ):
         """Scrape the courts portal for the data associated with the input incident numbers."""
 
@@ -122,7 +121,9 @@ class UJSPortalScraper:
             max_attempts=15,
             cleanup_hook=cleanup,
             pre_retry_hook=self._init,
-            wait=lambda n: min(min_sleep + 2 ** n + random.random(), max_sleep),
+            wait=lambda n: min(
+                self.min_sleep + 2 ** n + random.random(), self.max_sleep
+            ),
         )
         def _call(i):
 
@@ -143,7 +144,7 @@ class UJSPortalScraper:
                 results[dc_key] = scraping_result  # Could be empty list
 
                 # Sleep!
-                time.sleep(sleep)
+                time.sleep(self.sleep)
 
         # Loop over shootings and scrape
         try:
