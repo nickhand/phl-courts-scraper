@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Iterator, List, Optional
+from typing import Iterator, List
 
 import pandas as pd
 

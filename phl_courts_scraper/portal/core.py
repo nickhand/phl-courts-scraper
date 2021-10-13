@@ -1,19 +1,14 @@
 """Scrape data from the PA Unified Judicial System portal."""
 
-import random
 from dataclasses import dataclass
-from typing import Callable, List, Optional
+from typing import Optional
 
-from loguru import logger
-from selenium.common.exceptions import (
-    NoSuchElementException,
-    WebDriverException,
-)
+from bs4 import BeautifulSoup
+from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
-from tryagain import retries
 
 from .schema import PortalResults
 
@@ -51,9 +46,7 @@ class UJSPortalScraper:
         # select the search by dropdown element
         SEARCH_BY_DROPDOWN = "SearchBy-Control"
         input_searchtype = Select(
-            self.driver.find_element_by_css_selector(
-                f"#{SEARCH_BY_DROPDOWN} > select"
-            )
+            self.driver.find_element(By.CSS_SELECTOR, f"#{SEARCH_BY_DROPDOWN} > select")
         )
 
         # Search by police incident
@@ -78,20 +71,12 @@ class UJSPortalScraper:
             docket number
         """
 
-        # @retries(
-        #     max_attempts=5,
-        #     cleanup_hook=lambda: logger.info("Retrying..."),
-        #     pre_retry_hook=self._prep_url,
-        #     wait=lambda n: min(
-        #         min_sleep + 2 ** n + random.random(), max_sleep
-        #     ),
-        # )
         def _call():
 
             # Get the input element for the DC number
             INPUT_DC_NUMBER = "IncidentNumber-Control"
-            input_dc_number = self.driver.find_element_by_css_selector(
-                f"#{INPUT_DC_NUMBER} > input"
+            input_dc_number = self.driver.find_element(
+                By.CSS_SELECTOR, f"#{INPUT_DC_NUMBER} > input"
             )
 
             # Clear and add our desired DC number
@@ -100,9 +85,7 @@ class UJSPortalScraper:
 
             # Submit the search
             SEARCH_BUTTON = "btnSearch"
-            self.driver.find_element_by_css_selector(
-                f"#{SEARCH_BUTTON}"
-            ).click()
+            self.driver.find_element(By.CSS_SELECTOR, f"#{SEARCH_BUTTON}").click()
 
             # Results / no results elements
             RESULTS_CONTAINER = "caseSearchResultGrid"
@@ -114,18 +97,18 @@ class UJSPortalScraper:
                 ),
             )
 
+            # Initialize the soup
+            soup = BeautifulSoup(self.driver.page_source, "html.parser")
+
             # if results succeeded, parse them
             out = None
             try:
+
                 # Table holding the search results
-                results_table = self.driver.find_element_by_css_selector(
-                    f"#{RESULTS_CONTAINER}"
-                )
+                results_table = soup.select_one(f"#{RESULTS_CONTAINER}")
 
                 # The rows of the search page
-                results_rows = results_table.find_elements_by_css_selector(
-                    "tbody > tr"
-                )
+                results_rows = results_table.select("tbody > tr")
 
                 # result fields
                 fields = [
@@ -149,9 +132,9 @@ class UJSPortalScraper:
 
                     # the data displayed in the row itself
                     texts = [
-                        aa.text
-                        for aa in row.find_elements_by_css_selector("td")
-                        if aa.get_attribute("class") != "display-none"
+                        td.text
+                        for td in row.select("td")
+                        if "display-none" not in td.attrs.get("class", [])
                     ]
 
                     # No text? Skip!
@@ -164,10 +147,7 @@ class UJSPortalScraper:
                     X = dict(zip(fields, texts[:-1]))
 
                     # the urls to the court summary and docket sheet
-                    urls = [
-                        a.get_attribute("href")
-                        for a in row.find_elements_by_css_selector("a")
-                    ]
+                    urls = [a.attrs["href"] for a in row.select("a")]
                     X["court_summary_url"] = urls[-1]
                     X["docket_sheet_url"] = urls[-2]
 

@@ -3,7 +3,7 @@
 import collections
 from dataclasses import dataclass
 from operator import attrgetter, itemgetter
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 from ..utils import (
     Word,
