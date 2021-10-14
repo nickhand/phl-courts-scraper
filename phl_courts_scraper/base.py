@@ -50,6 +50,7 @@ class DownloadedPDFScraper:
     min_sleep: int = 30
     max_sleep: int = 120
     sleep: int = 2
+    errors: str = "ignore"
 
     def _init(self, dirname):
         """Initialization function."""
@@ -117,8 +118,19 @@ class DownloadedPDFScraper:
             try:
                 for i in range(N):
                     _call(i)
-            except:
-                logger.exception(f"Exception raised; i = {i} & last PDF = {urls[i]}")
+            except Exception as e:
+                # Skip
+                if self.errors == "ignore":
+                    logger.info(f"Exception raised for i = {i} & PDF '{urls[i]}'")
+                    logger.info(f"Ignoring exception: {str(e)}")
+
+                    # Add None for failure
+                    results[urls[i]] = None
+
+                # Raise
+                else:
+                    logger.exception(f"Exception raised for i = {i} & PDF '{urls[i]}'")
+                    raise
             finally:
                 logger.debug(f"Done scraping: {i+1} PDFs scraped")
 
