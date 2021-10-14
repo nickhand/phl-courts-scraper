@@ -2,29 +2,54 @@
 
 from __future__ import annotations
 
-import datetime
 import itertools
 import json
-from dataclasses import asdict, dataclass
+import time
+from contextlib import contextmanager
+from dataclasses import dataclass
 from operator import attrgetter
 from pathlib import Path
-from typing import (
-    Dict,
-    Iterable,
-    Iterator,
-    List,
-    Optional,
-    Type,
-    TypeVar,
-    Union,
-)
+from typing import Dict, Iterable, Iterator, List, Optional, Type, TypeVar, Union
 
 import desert
 import marshmallow
 import numpy as np
-import pandas as pd
 import pdfplumber
 from intervaltree import IntervalTree
+from loguru import logger
+
+
+@contextmanager
+def downloaded_pdf(driver, pdf_url, tmpdir, interval=1, time_limit=7):
+    """Context manager to download a PDF to a local directory."""
+
+    # Output path
+    download_dir = Path(tmpdir)
+    pdf_path = None
+
+    try:
+        # Get the PDF
+        driver.get(pdf_url)
+
+        # Initialize
+        pdf_files = list(download_dir.glob("*.pdf"))
+        total_sleep = 0
+        while not len(pdf_files) and total_sleep <= time_limit:
+            time.sleep(interval)
+            total_sleep += interval
+            pdf_files = list(download_dir.glob("*.pdf"))
+
+        if len(pdf_files):
+            pdf_path = pdf_files[0]
+            yield pdf_path
+        else:
+            raise ValueError("PDF download failed")
+    finally:
+
+        # Remove the file after we are done!
+        if pdf_path is not None and pdf_path.exists():
+            pdf_path.unlink()
+
 
 # Create a generic variable that can be 'Parent', or any subclass.
 Word_T = TypeVar("Word_T", bound="Word")
@@ -188,9 +213,7 @@ def to_snake_case(d: dict, replace: List[str] = ["."]) -> dict:
             key = key.replace(c, "")
         return key.lower()
 
-    return {
-        "_".join(_format_key(key).split()): value for key, value in d.items()
-    }
+    return {"_".join(_format_key(key).split()): value for key, value in d.items()}
 
 
 def groupby(words: List[Word], key: str, sort: bool = False) -> Iterator:
@@ -207,9 +230,7 @@ def find_nearest(array: Iterable, value: float) -> int:
     return idx
 
 
-def group_into_lines(
-    words: List[Word], tolerance: int = 10
-) -> Dict[float, List[Word]]:
+def group_into_lines(words: List[Word], tolerance: int = 10) -> Dict[float, List[Word]]:
     """Group words into lines, with a specified tolerance."""
     tree = IntervalTree()
     for i in range(len(words)):
@@ -283,9 +304,7 @@ class DataclassSchema:
         schema = desert.schema(self.__class__)
         return schema.dump(self)
 
-    def to_json(
-        self, path: Optional[Union[str, Path]] = None
-    ) -> Optional[str]:
+    def to_json(self, path: Optional[Union[str, Path]] = None) -> Optional[str]:
         """
         Serialize the object to JSON, either returning a valid JSON
         string or saving to the input file path.
@@ -306,7 +325,8 @@ class DataclassSchema:
             if isinstance(path, str):
                 path = Path(path)
             json.dump(
-                d, path.open("w"),
+                d,
+                path.open("w"),
             )
 
             return None

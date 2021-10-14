@@ -96,10 +96,7 @@ class UJSPortalScraper:
         # Search by police incident
         input_searchtype.select_by_visible_text("Incident Number")
 
-    def scrape_incident_data(
-        self,
-        incident_numbers,
-    ):
+    def scrape_incident_data(self, incident_numbers):
         """Scrape the courts portal for the data associated with the input incident numbers."""
 
         # Initialize if we need to

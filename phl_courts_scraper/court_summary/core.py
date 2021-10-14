@@ -1,18 +1,13 @@
 """Module for parsing court summary reports."""
 
 import collections
-from dataclasses import dataclass
+import re
 from operator import attrgetter, itemgetter
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
-from ..utils import (
-    Word,
-    find_nearest,
-    get_pdf_words,
-    group_into_lines,
-    groupby,
-    to_snake_case,
-)
+from ..base import DownloadedPDFScraper
+from ..utils import (Word, find_nearest, get_pdf_words, group_into_lines,
+                     groupby, to_snake_case)
 from .schema import CourtSummary
 
 __all__ = ["CourtSummaryParser"]
@@ -318,9 +313,11 @@ def _parse_header(words: List[Word], firstSectionTitle: str) -> dict:
     # Get the line number containing "Active"
     i = _find_line_number(words, firstSectionTitle)
 
-    # Remove any page header, e.g., FJD and Court Summary
-    bad = ["Court Summary", "First Judicial District of Pennsylvania"]
-    header_words = [w for w in words[:i] if w.text not in bad]
+    # Get the line that says "Court Summary"
+    j = _find_line_number(words, "Court Summary")
+
+    # Trim to header valid range
+    header_words = words[j + 1 : i]
 
     info = []
     for key, val in groupby(header_words, "x", sort=True):
@@ -377,7 +374,10 @@ def _parse_docket_header(
 
 
 def _find_line_number(
-    words: List[Word], text: str, how: str = "equals", missing: str = "raise",
+    words: List[Word],
+    text: str,
+    how: str = "equals",
+    missing: str = "raise",
 ) -> Optional[int]:
     """Return the first line number associated with a specific text.
 
@@ -405,7 +405,10 @@ def _find_line_number(
 
 
 def _find_line_numbers(
-    words: List[Word], text: str, how: str = "equals", missing: str = "raise",
+    words: List[Word],
+    text: str,
+    how: str = "equals",
+    missing: str = "raise",
 ) -> List[int]:
     """Return the line numbers associated with a specific text.
 
@@ -426,7 +429,7 @@ def _find_line_numbers(
     line_numbers :
         a list of line numbers matching the text
     """
-    assert how in ["equals", "contains"]
+    assert how in ["equals", "contains", "regex"]
 
     def contains(a, b):
         return b in a
@@ -434,10 +437,15 @@ def _find_line_numbers(
     def equals(a, b):
         return a == b
 
+    def matches(a, b):
+        return re.match(b, a) is not None
+
     if how == "equals":
         tester = equals
-    else:
+    elif how == "contains":
         tester = contains
+    else:
+        tester = matches
 
     # Test each word
     listOfElements = [tester(w.text, text) for w in words]
@@ -476,12 +484,17 @@ def _yield_dockets(
     docket :
         the words for each docket
     """
+    header_pattern = (
+        "(First Judicial District of Pennsylvania)|(.* County Court of Common Pleas)"
+    )
+
     # Delete any headers
     max_header_size = 5
     for pg in reversed(
         _find_line_numbers(
             dockets,
-            "First Judicial District of Pennsylvania",
+            header_pattern,
+            how="regex",
             missing="ignore",
         )
     ):
@@ -493,11 +506,8 @@ def _yield_dockets(
                 w = dockets[pg + i]
 
                 if (
-                    w.text
-                    in [
-                        "First Judicial District of Pennsylvania",
-                        "Court Summary",
-                    ]
+                    w.text == "Court Summary"
+                    or re.match(header_pattern, w.text) is not None
                     or "Continued" in w.text
                 ):
                     del dockets[pg + i]
@@ -543,24 +553,15 @@ def _yield_dockets(
         returned_dockets.append(this_docket_num)
 
 
-@dataclass
-class CourtSummaryParser:
-    """A class to parse court summary reports.
+class CourtSummaryParser(DownloadedPDFScraper):
+    """A class to parse court summary reports."""
 
-    Parameters
-    ----------
-    path :
-        the path to the PDF report to parse
-    """
-
-    path: str
-
-    def __call__(self):
+    def __call__(self, pdf_path):
         """Parse and return a court summary document."""
 
         # Parse PDF into a list of words
         words = get_pdf_words(
-            self.path,
+            pdf_path,
             keep_blank_chars=True,
             x_tolerance=5,
             y_tolerance=0,
@@ -603,9 +604,7 @@ class CourtSummaryParser:
 
             # Determine line number of sections
             this_section_start = sorted_starts[this_section]
-            next_section_start = (
-                sorted_starts[next_section] if next_section else None
-            )
+            next_section_start = sorted_starts[next_section] if next_section else None
 
             # Trim the words to just lines in this section
             section_words = words[this_section_start:next_section_start]

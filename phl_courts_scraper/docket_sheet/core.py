@@ -1,10 +1,10 @@
-from dataclasses import dataclass
 from typing import List, Optional
 
 import numpy as np
 import pandas as pd
 import pdfplumber
 
+from ..base import DownloadedPDFScraper
 from ..utils import Word, find_phrases
 
 
@@ -66,19 +66,10 @@ def _parse(
     return None
 
 
-@dataclass
-class DocketSheetParser:
-    """A class to parse docket sheet reports.
+class DocketSheetParser(DownloadedPDFScraper):
+    """A class to parse docket sheet reports."""
 
-    Parameters
-    ----------
-    path :
-        the path to the PDF report to parse
-    """
-
-    path: str
-
-    def __call__(self, section: str = "bail") -> Optional[pd.DataFrame]:
+    def __call__(self, pdf_path, section: str = "bail") -> Optional[pd.DataFrame]:
         """Parse the docket sheet."""
 
         allowed_sections = ["bail"]
@@ -90,7 +81,7 @@ class DocketSheetParser:
 
         # Open the PDF
         out = None
-        with pdfplumber.open(self.path) as pdf:
+        with pdfplumber.open(pdf_path) as pdf:
 
             # Loop through pages
             for pg in pdf.pages:
