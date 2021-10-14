@@ -32,9 +32,7 @@ def get_webdriver(browser, dirname, debug=False):
         options.add_experimental_option("prefs", profile)
 
         # Initialize with options
-        service = Service(
-            "/Users/nicholashand/.wdm/drivers/chromedriver/mac64/94.0.4606.61/chromedriver"
-        )  # ChromeDriverManager().install())
+        service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=options)
     else:
         raise ValueError("Unknown browser type, should be 'chrome'")
