@@ -72,7 +72,7 @@ class DownloadedPDFScraper:
             logger.info(f"Scraping info for {N} PDFs")
 
             # Save new results here
-            results = {}
+            results = []
 
             def cleanup():
                 self.driver.close()
@@ -109,7 +109,7 @@ class DownloadedPDFScraper:
                     report = self(pdf_path)
 
                     # Save the results
-                    results[remote_pdf_path] = report.to_dict()
+                    results.append(report.to_dict())
 
                 # Sleep
                 time.sleep(self.sleep)
@@ -123,9 +123,6 @@ class DownloadedPDFScraper:
                 if self.errors == "ignore":
                     logger.info(f"Exception raised for i = {i} & PDF '{urls[i]}'")
                     logger.info(f"Ignoring exception: {str(e)}")
-
-                    # Add None for failure
-                    results[urls[i]] = None
 
                 # Raise
                 else:

@@ -108,7 +108,7 @@ class UJSPortalScraper:
         logger.info(f"Scraping info for {N} incidents")
 
         # Save new results here
-        results = {}
+        results = []
 
         def cleanup():
             self.driver.close()
@@ -138,7 +138,7 @@ class UJSPortalScraper:
                 scraping_result = scraping_result.to_dict()["data"]
 
                 # Save results
-                results[dc_key] = scraping_result  # Could be empty list
+                results.append(scraping_result)  # Could be empty list
 
                 # Sleep!
                 time.sleep(self.sleep)
