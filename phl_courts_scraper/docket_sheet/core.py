@@ -63,6 +63,10 @@ def _parse(
             columns=dict(zip(df.columns, df.loc[0].fillna(df.loc[1]).tolist()))
         )
 
+        # Format the columns
+        df.columns = ["_".join(col.lower().split()) for col in df.columns]
+        df = df.rename(columns={"date": "bail_date"}).fillna("")
+
         return df.reset_index(drop=True).to_dict(orient="records")
 
     return None
