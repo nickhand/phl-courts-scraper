@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "phl-courts-scraper"
-version = "0.1.0"
+version = "0.1.1"
 description = "A Python utility to scrape docket sheets and court summaries for Philadelphia courts."
 authors = ["Nick Hand <nick.hand@phila.gov>"]
 license = "MIT"
