@@ -1,4 +1,5 @@
 from typing import List, Optional
+from urllib.parse import parse_qs, urlparse
 
 import numpy as np
 import pandas as pd
@@ -6,6 +7,7 @@ import pdfplumber
 
 from ..base import DownloadedPDFScraper
 from ..utils import Word, find_phrases
+from .schema import DocketSheetResults
 
 
 def _parse(
@@ -61,7 +63,7 @@ def _parse(
             columns=dict(zip(df.columns, df.loc[0].fillna(df.loc[1]).tolist()))
         )
 
-        return df.reset_index(drop=True)
+        return df.reset_index(drop=True).to_dict(orient="records")
 
     return None
 
@@ -105,4 +107,4 @@ class DocketSheetParser(DownloadedPDFScraper):
         if out is None:
             raise ValueError("Parsing failed!")
 
-        return out
+        return DocketSheetResults.from_dict({"data": out})

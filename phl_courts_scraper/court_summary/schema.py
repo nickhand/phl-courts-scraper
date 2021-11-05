@@ -2,7 +2,7 @@
 
 import datetime
 from dataclasses import dataclass, field, fields
-from typing import Any, Iterator, List, Optional, Union
+from typing import Any, Iterator, List, Optional
 
 import desert
 import marshmallow
@@ -54,9 +54,7 @@ class Sentence(DataclassSchema):
     """
 
     sentence_type: str
-    sentence_dt: str = desert.field(
-        TimeField(format="%m/%d/%Y", allow_none=True)
-    )
+    sentence_dt: str = desert.field(TimeField(format="%m/%d/%Y", allow_none=True))
     program_period: str = ""
     sentence_length: str = ""
 
@@ -105,9 +103,7 @@ class Charge(DataclassSchema):
 
         exclude = ["sentences"]
         return {
-            f.name: getattr(self, f.name)
-            for f in fields(self)
-            if f.name not in exclude
+            f.name: getattr(self, f.name) for f in fields(self) if f.name not in exclude
         }
 
     def __iter__(self) -> Iterator[Sentence]:
@@ -192,9 +188,7 @@ class Docket(DataclassSchema):
     county: str
     status: str
     extra: List[Any]
-    arrest_dt: str = desert.field(
-        TimeField(format="%m/%d/%Y", allow_none=True)
-    )
+    arrest_dt: str = desert.field(TimeField(format="%m/%d/%Y", allow_none=True))
     psi_num: str = ""
     prob_num: str = ""
     disp_judge: str = ""
@@ -227,9 +221,7 @@ class Docket(DataclassSchema):
         out = pd.DataFrame([c.to_dict() for c in self])
 
         # Convert sentences dicts to Sentence objects
-        out["sentences"] = out["sentences"].apply(
-            lambda l: [Sentence(**v) for v in l]
-        )
+        out["sentences"] = out["sentences"].apply(lambda l: [Sentence(**v) for v in l])
         return out
 
     @property
@@ -238,9 +230,7 @@ class Docket(DataclassSchema):
 
         exclude = ["charges"]
         return {
-            f.name: getattr(self, f.name)
-            for f in fields(self)
-            if f.name not in exclude
+            f.name: getattr(self, f.name) for f in fields(self) if f.name not in exclude
         }
 
     def __getitem__(self, index):
@@ -318,9 +308,7 @@ class CourtSummary(DataclassSchema):
         out = pd.DataFrame([c.to_dict() for c in self])
 
         # Convert charge dicts to Charge objects
-        out["charges"] = out["charges"].apply(
-            lambda l: [Charge(**v) for v in l]
-        )
+        out["charges"] = out["charges"].apply(lambda l: [Charge(**v) for v in l])
 
         # Each row is a Docket
         return out
@@ -331,9 +319,7 @@ class CourtSummary(DataclassSchema):
 
         exclude = ["dockets"]
         return {
-            f.name: getattr(self, f.name)
-            for f in fields(self)
-            if f.name not in exclude
+            f.name: getattr(self, f.name) for f in fields(self) if f.name not in exclude
         }
 
     def __iter__(self) -> Iterator[Docket]:

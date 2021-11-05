@@ -129,10 +129,14 @@ class UJSPortalScraper:
             dc_key = str(incident_numbers[i])
 
             # Some DC keys for OIS are shorter
-            if len(dc_key) == 12:
+            if len(dc_key) in [10, 12]:
+
+                # Make sure the length is 10
+                if len(dc_key) == 12:
+                    dc_key = dc_key[2:]
 
                 # Scrape!
-                scraping_result = self(dc_key[2:])
+                scraping_result = self(dc_key)
 
                 # Get the list of results
                 scraping_result = scraping_result.to_dict()["data"]
@@ -172,6 +176,10 @@ class UJSPortalScraper:
             A PortalResults holding details for each unique
             docket number
         """
+        # Initialize if we need to
+        if not hasattr(self, "driver"):
+            self._init()
+
         # Get the input element for the DC number
         INPUT_DC_NUMBER = "IncidentNumber-Control"
         input_dc_number = self.driver.find_element(

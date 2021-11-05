@@ -1,23 +1,11 @@
 import pytest
 from phl_courts_scraper.portal import PortalResult, PortalResults, UJSPortalScraper
-from selenium import webdriver
-from webdriver_manager.chrome import ChromeDriverManager
 
 
 @pytest.fixture
 def scraper():
     """Return a `UJSPortalScraper` to use in multiple tests."""
-
-    # Initialize the driver
-    options = webdriver.ChromeOptions()
-    options.add_argument("--headless")
-    driver = webdriver.Chrome(
-        "/Users/nicholashand/.wdm/drivers/chromedriver/mac64/94.0.4606.61/chromedriver",
-        options=options,
-    )
-
-    # Return the scraper
-    return UJSPortalScraper(driver)
+    return UJSPortalScraper()
 
 
 def test_scrape_successful(scraper):

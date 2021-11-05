@@ -1,8 +1,15 @@
 from pathlib import Path
 
+import pytest
 from phl_courts_scraper.court_summary import CourtSummary, CourtSummaryParser
 
 current_dir = Path(__file__).parent.absolute()
+
+
+@pytest.fixture
+def parser():
+    """Return a `CourtSummaryParser` to use in multiple tests."""
+    return CourtSummaryParser()
 
 
 def _test_report(report):
@@ -29,23 +36,17 @@ def _test_report(report):
     assert report.to_dict() == report2.to_dict()
 
 
-def test_court_summary_1():
+def test_court_summary_1(parser):
     """Test example #1 of court summary report."""
 
     # Initialize
-    parser = CourtSummaryParser(
-        current_dir / "data" / "CourtSummaryReport1.pdf"
-    )
-    report = parser()
+    report = parser(current_dir / "data" / "CourtSummaryReport1.pdf")
     _test_report(report)
 
 
-def test_court_summary_2():
+def test_court_summary_2(parser):
     """Test example #2 of court summary report."""
 
     # Initialize
-    parser = CourtSummaryParser(
-        current_dir / "data" / "CourtSummaryReport2.pdf"
-    )
-    report = parser()
+    report = parser(current_dir / "data" / "CourtSummaryReport2.pdf")
     _test_report(report)
