@@ -12,11 +12,11 @@ repos:
     hooks:
       - id: flake8
         name: flake8
-        entry: poetry run flake8 --config setup.cfg
+        entry: make flake8
         language: system
         types: [python]
-      # - id: mypy
-      #   name: mypy
-      #   entry: poetry run mypy --config-file setup.cfg --exclude tests phl_courts_scraper
-      #   language: system
-      #   types: [python]
+      - id: mypy
+        name: mypy
+        entry: make mypy
+        language: system
+        types: [python]
