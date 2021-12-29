@@ -15,8 +15,8 @@ repos:
         entry: poetry run flake8 --config setup.cfg
         language: system
         types: [python]
-      - id: mypy
-        name: mypy
-        entry: poetry run mypy --config-file setup.cfg --verbose
-        language: system
-        types: [python]
+      # - id: mypy
+      #   name: mypy
+      #   entry: poetry run mypy --config-file setup.cfg --exclude tests phl_courts_scraper
+      #   language: system
+      #   types: [python]
