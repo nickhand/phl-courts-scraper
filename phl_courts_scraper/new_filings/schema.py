@@ -1,60 +1,53 @@
-"""Schema for portal scraper."""
+"""Schema for new criminal filing scraper."""
 
 from dataclasses import dataclass
 from typing import Iterator, List
 
+import desert
 import pandas as pd
 
-from ..utils import DataclassSchema
+from ..utils import DataclassSchema, TimeField
 
 
 @dataclass
-class PortalResult(DataclassSchema):
+class NewCriminalFiling(DataclassSchema):
     """
     The scraped result from the UJS portal page.
 
     Parameters
     ----------
+    defendant_name: str
+        The name of the defendant
+    age: str
+        The age of the defendant
+    address: str
+        The defendant's address
     docket_number: str
-        The docket number of the case
-    short_caption: str
-        The short caption of the case
+        The docket number
     filing_date: str
-        The filing date of the case
-    county: str
-        The county of the case
-    party: str
-        The party of the case
-    case_status: str
-        The current case status
-    otn: str
-        The offense tracking number
-    lotn: str
-        The law tracking number
-    dc_number: str
-        The DC number
-    date_of_birth: str
-        The date of birth of the party
-    docket_sheet_url: str
-        The docket sheet URL
-    court_summary_url: url
-        The court summary URL
+        The date the filing was filed
+    charge: str
+        The criminal charge
+    represented: str
+        The name of the person who represented the defendant
+    bail_status: str
+        The current bail status
     """
 
+    defendant_name: str
+    age: str
+    address: str
     docket_number: str
-    court_type: str
-    short_caption: str
-    case_status: str
     filing_date: str
-    party: str
-    date_of_birth: str
-    county: str
-    court_office: str
-    otn: str
-    lotn: str
-    dc_number: str
-    docket_sheet_url: str
-    court_summary_url: str
+    charge: str
+    represented: str
+    bail_status: str
+    bail_type: str
+    bail_amount: float
+    outstanding_bail_amount: float
+    bail_date: str = desert.field(
+        TimeField(format="%m/%d/%Y %H:%M:%S %p", allow_none=True)
+    )  # type: ignore
 
     def __repr__(self) -> str:
         """Return a string representation of the object."""
@@ -68,19 +61,19 @@ class PortalResult(DataclassSchema):
 
 
 @dataclass
-class PortalResults(DataclassSchema):
+class NewCriminalFilings(DataclassSchema):
     """
     List of results from portal scraping.
 
     Parameters
     ----------
-    data: List[PortalResult]
+    data: List[NewCriminalFiling]
         The list of results
     """
 
-    data: List[PortalResult]
+    data: List[NewCriminalFiling]
 
-    def __iter__(self) -> Iterator[PortalResult]:
+    def __iter__(self) -> Iterator[NewCriminalFiling]:
         """Yield the object's results."""
         return iter(self.data)
 
@@ -88,7 +81,7 @@ class PortalResults(DataclassSchema):
         """Return the number of results."""
         return len(self.data)
 
-    def __getitem__(self, index: int) -> PortalResult:
+    def __getitem__(self, index: int) -> NewCriminalFiling:
         """Index the data list."""
         return self.data.__getitem__(index)
 

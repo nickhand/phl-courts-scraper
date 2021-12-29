@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import itertools
 import json
 import time
@@ -25,9 +26,70 @@ from typing import (
 import desert
 import marshmallow
 import numpy as np
+import pandas as pd
 import pdfplumber
 from intervaltree import IntervalTree
 from selenium import webdriver
+
+
+class TimeField(marshmallow.fields.DateTime):
+    """Custom time field to handle string to datetime conversion."""
+
+    def _serialize(self, value, attr, obj, **kwargs):  # type: ignore
+        """Return string representation of datetime objects."""
+        if not value:
+            return ""
+        if isinstance(value, datetime.datetime):
+            assert self.format is not None
+            return value.strftime(self.format)
+        return super()._serialize(value, attr, obj, **kwargs)
+
+    def _deserialize(self, value, attr, data, **kwargs):  # type: ignore
+        """Convert strings to datetime objects."""
+        if value == "":
+            return None
+        if isinstance(value, datetime.datetime):
+            return value
+
+        return super()._deserialize(value, attr, data, **kwargs)
+
+
+def convert_to_floats(
+    df: pd.DataFrame,
+    usecols: Optional[List[str]] = None,
+    errors: str = "coerce",
+) -> pd.DataFrame:
+    """
+    Convert string values in currency format to floats.
+
+    Parameters
+    ----------
+    df: pd.DataFrame
+        the data to format
+    usecols: List[str]
+        an optional list of columns to convert
+    errors: str
+        - If `raise`, then invalid parsing will raise an exception.
+        - If `coerce`, then invalid parsing will be set as NaN.
+        - If `ignore`, then invalid parsing will return the input.
+
+    Returns
+    -------
+    df: pd.DataFrame
+        The dataframe with the values converted to floats
+    """
+    if usecols is None:
+        usecols = df.columns
+
+    for col in usecols:
+        df[col] = pd.to_numeric(
+            df[col]
+            .replace(r"[\$,)]", "", regex=True)
+            .replace("[(]", "-", regex=True),
+            errors=errors,
+        )
+
+    return df
 
 
 @contextmanager
@@ -58,6 +120,11 @@ def downloaded_pdf(
     ------
     pdf_path: Path
         The path to the downloaded PDF
+
+    Raises
+    ------
+    ValueError
+        If the PDF cannot be downloaded within the time limit
     """
     # The download folder
     download_dir = Path(tmpdir)
@@ -260,6 +327,11 @@ def to_snake_case(
         Contains the keys to convert
     replace: List[str]
         A list of characters to replace with blanks
+
+    Returns
+    -------
+    Dict[str, str]
+        The converted dictionary
     """
 
     def _format_key(key: str) -> str:

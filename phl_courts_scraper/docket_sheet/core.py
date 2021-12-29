@@ -1,4 +1,4 @@
-# """Module for scraping docket sheet reports."""
+"""Module for scraping docket sheet reports."""
 
 # from pathlib import Path
 # from typing import List, Optional

@@ -1,3 +1,4 @@
+"""Define the schema for the docket sheet scraper."""
 # from dataclasses import dataclass
 # from typing import Iterator, List, Optional
 

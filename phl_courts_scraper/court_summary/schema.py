@@ -1,35 +1,13 @@
 """Define the schema for the court summary report."""
 
-import datetime
+
 from dataclasses import dataclass, field, fields
 from typing import Any, Dict, Iterator, List, Optional
 
 import desert
-import marshmallow
 import pandas as pd
 
-from ..utils import DataclassSchema
-
-
-class TimeField(marshmallow.fields.DateTime):
-    """Custom time field to handle string to datetime conversion."""
-
-    def _serialize(self, value, attr, obj, **kwargs):  # type: ignore
-        """Return string representation of datetime objects."""
-        if not value:
-            return ""
-        if isinstance(value, datetime.datetime):
-            return value.strftime("%m/%d/%Y")
-        return super()._serialize(value, attr, obj, **kwargs)
-
-    def _deserialize(self, value, attr, data, **kwargs):  # type: ignore
-        """Convert strings to datetime objects."""
-        if value == "":
-            return None
-        if isinstance(value, datetime.datetime):
-            return value
-
-        return super()._deserialize(value, attr, data, **kwargs)
+from ..utils import DataclassSchema, TimeField
 
 
 @dataclass
@@ -52,7 +30,7 @@ class Sentence(DataclassSchema):
     sentence_type: str
     sentence_dt: str = desert.field(
         TimeField(format="%m/%d/%Y", allow_none=True)
-    )
+    )  # type: ignore
     program_period: str = ""
     sentence_length: str = ""
 
@@ -191,7 +169,7 @@ class Docket(DataclassSchema):
     extra: List[Any]
     arrest_dt: str = desert.field(
         TimeField(format="%m/%d/%Y", allow_none=True)
-    )
+    )  # type: ignore
     psi_num: str = ""
     prob_num: str = ""
     disp_judge: str = ""
@@ -203,16 +181,16 @@ class Docket(DataclassSchema):
     next_action_room: str = ""
     next_action_date: Optional[str] = desert.field(
         TimeField(format="%m/%d/%Y", allow_none=True), default=""
-    )
+    )  # type: ignore
     last_action_date: Optional[str] = desert.field(
         TimeField(format="%m/%d/%Y", allow_none=True), default=""
-    )
+    )  # type: ignore
     trial_dt: Optional[str] = desert.field(
         TimeField(format="%m/%d/%Y", allow_none=True), default=""
-    )
+    )  # type: ignore
     disp_date: Optional[str] = desert.field(
         TimeField(format="%m/%d/%Y", allow_none=True), default=""
-    )
+    )  # type: ignore
     charges: List[Charge] = field(default_factory=list)
 
     def to_pandas(self) -> pd.DataFrame:
@@ -245,7 +223,7 @@ class Docket(DataclassSchema):
         return iter(self.charges)
 
     def __len__(self) -> int:
-        """The number of charges."""
+        """Return the number of charges."""
         return len(self.charges)
 
     def __repr__(self) -> str:
