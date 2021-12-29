@@ -9,23 +9,34 @@ from ..utils import DataclassSchema
 @dataclass
 class PortalResult(DataclassSchema):
     """
-    A single result returned on the main UJS portal page when
-    searching by incident number.
+    The scraped result from the UJS portal page.
 
     Parameters
     ----------
-    docket_number
-    short_caption
-    filing_date
-    county
-    party
-    case_status
-    otn
-    lotn
-    dc_number
-    date_of_birth
-    docket_sheet_url
-    court_summary_url
+    docket_number: str
+        The docket number of the case
+    short_caption: str
+        The short caption of the case
+    filing_date: str
+        The filing date of the case
+    county: str
+        The county of the case
+    party: str
+        The party of the case
+    case_status: str
+        The current case status
+    otn: str
+        The offense tracking number
+    lotn: str
+        The law tracking number
+    dc_number: str
+        The DC number
+    date_of_birth: str
+        The date of birth of the party
+    docket_sheet_url: str
+        The docket sheet URL
+    court_summary_url: url
+        The court summary URL
     """
 
     docket_number: str
@@ -43,25 +54,26 @@ class PortalResult(DataclassSchema):
     docket_sheet_url: str
     court_summary_url: str
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Return a string representation of the object."""
         cls = self.__class__.__name__
         fields = ["docket_number", "filing_date", "party"]
         s = []
         for f in fields:
             s.append(f"{f}='{getattr(self, f)}'")
-        s = ", ".join(s)
-        return f"{cls}({s})"
+        out = ", ".join(s)
+        return f"{cls}({out})"
 
 
 @dataclass
 class PortalResults(DataclassSchema):
     """
-    All of the results returned on the main UJS portal page when
-    searching by incident number.
+    List of results from portal scraping.
 
     Parameters
     ----------
-    data
+    data: List[PortalResult]
+        The list of results
     """
 
     data: List[PortalResult]
@@ -74,17 +86,15 @@ class PortalResults(DataclassSchema):
         """Return the number of results."""
         return len(self.data)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> PortalResult:
         """Index the data list."""
         return self.data.__getitem__(index)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Return the string representation of the object."""
         cls = self.__class__.__name__
         return f"{cls}(num_results={len(self)})"
 
     def to_pandas(self) -> pd.DataFrame:
-        """
-        Return a dataframe representation of the data,
-        where each row represents a result.
-        """
+        """Return a dataframe representation of the data."""
         return pd.DataFrame([c.to_dict() for c in self])

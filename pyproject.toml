@@ -16,7 +16,7 @@ desert = "^2020.11.18"
 loguru = "^0.5.3"
 beautifulsoup4 = "^4.10.0"
 tryagain = "^1.0"
-importlib-metadata = "^4.8.1"
+importlib-metadata = "<4.3"
 
 [tool.poetry.dev-dependencies]
 black = "^21.9b0"
@@ -24,7 +24,37 @@ pytest = "^6.2.5"
 jupyterlab = "^3.1.18"
 ipython = "^7.28.0"
 isort = "^5.9.3"
+mypy = "^0.930"
+pre-commit = "^2.16.0"
+flake8 = "^4.0.1"
+darglint = "^1.8.1"
+flake8-black = "^0.2.3"
+flake8-docstrings = "^1.6.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 79
+target-version = ['py38']
+include = '\.pyi?$'
+exclude = '''
+
+(
+  /(
+      \.eggs         # exclude a few common directories in the
+    | \.git          # root of the project
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | _build
+    | buck-out
+    | build
+    | dist
+  )/
+  | foo.py           # also separately exclude a file named foo.py in
+                     # the root of the project
+)
+'''

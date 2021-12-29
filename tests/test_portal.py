@@ -1,5 +1,6 @@
 import pytest
-from phl_courts_scraper.portal import PortalResult, PortalResults, UJSPortalScraper
+from phl_courts_scraper.portal.core import UJSPortalScraper
+from phl_courts_scraper.portal.schema import PortalResult, PortalResults
 
 
 @pytest.fixture

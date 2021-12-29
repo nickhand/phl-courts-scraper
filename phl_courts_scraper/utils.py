@@ -9,24 +9,60 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from operator import attrgetter
 from pathlib import Path
-from typing import Dict, Iterable, Iterator, List, Optional, Type, TypeVar, Union
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
 
 import desert
 import marshmallow
 import numpy as np
 import pdfplumber
 from intervaltree import IntervalTree
-from loguru import logger
+from selenium import webdriver
 
 
 @contextmanager
-def downloaded_pdf(driver, pdf_url, tmpdir, interval=1, time_limit=7):
-    """Context manager to download a PDF to a local directory."""
+def downloaded_pdf(
+    driver: webdriver.Chrome,
+    pdf_url: str,
+    tmpdir: str,
+    interval: int = 1,
+    time_limit: int = 7,
+) -> Iterator[Path]:
+    """
+    Context manager to download a PDF to a local directory.
 
-    # Output path
+    Parameters
+    ----------
+    driver: webdriver.Chrome
+        The webdriver to use to download the PDF
+    pdf_url: str
+        The URL to download the PDF from
+    tmpdir: str
+        The local (temporary) download folder
+    interval: int
+        The interval to wait between each download attempt
+    time_limit: int
+        The maximum time to wait to download the PDF
+
+    Yields
+    ------
+    pdf_path: Path
+        The path to the downloaded PDF
+    """
+    # The download folder
     download_dir = Path(tmpdir)
-    pdf_path = None
 
+    pdf_path = None
     try:
         # Get the PDF
         driver.get(pdf_url)
@@ -62,16 +98,16 @@ class Word:
 
     Parameters
     ----------
-    x0 :
-        the starting horizontal coordinate
-    x1 :
-        the ending horizontal coordinate
-    bottom :
-        the bottom vertical coordinate
-    top :
-        the top vertical coordinate
-    text :
-        the associated text
+    x0: float
+        The starting horizontal coordinate
+    x1: float
+        The ending horizontal coordinate
+    bottom: float
+        The bottom vertical coordinate
+    top: float
+        The top vertical coordinate
+    text: str
+        The associated text
     """
 
     x0: float
@@ -91,16 +127,8 @@ class Word:
         return self.top
 
     @classmethod
-    def from_dict(cls: Type[Word_T], data: dict) -> Word_T:
-        """
-        Return a new class instance from a dictionary
-        representation.
-
-        Parameters
-        ----------
-        data :
-            The dictionary representation of the class.
-        """
+    def from_dict(cls: Type[Word_T], data: Dict[str, Any]) -> Word_T:
+        """Initialize from a data dictionary."""
         schema = desert.schema(cls, meta={"unknown": marshmallow.EXCLUDE})
         return schema.load(data)
 
@@ -111,12 +139,16 @@ def find_phrases(words: List[Word], *keywords: str) -> Optional[List[Word]]:
 
     Parameters
     ----------
-    words :
-        the list of words to check
-    *keywords
-        one or more keywords representing the phrase to search for
-    """
+    words: List[Word]
+        The list of words to check
+    keywords: str
+        One or more keywords representing the phrase to search for
 
+    Returns
+    -------
+    phrase: List[Word]
+        If a match exists, return the matching words
+    """
     # Make sure we have keywords
     assert len(keywords) > 0
 
@@ -147,20 +179,30 @@ def get_pdf_words(
     header_cutoff: int = 0,
     keep_blank_chars: bool = False,
 ) -> List[Word]:
-    """Parse a PDF and return the parsed words as well as x/y
-    locations.
+    """
+    Parse a PDF into its words.
+
+    This will return the parsed words as well as x/y locations.
 
     Parameters
     ----------
-    pdf_path :
-        the path to the PDF to parse
-    x_tolerance : optional
-        the tolerance to use when extracting out words
+    pdf_path: str
+        The path to the PDF to parse
+    x_tolerance: int
+        The x tolerance to use when extracting out words
+    y_tolerance: int
+        The y tolerance to use when extracting out words
+    footer_cutoff: int
+        The amount of page to ignore at the bottom of the page
+    header_cutoff: int
+        The amount of page to ignore at the top of the page
+    keep_blank_chars: bool
+        Whether to keep the blank characters when parsing words
 
     Returns
     -------
-    words :
-        a list of Word objects in the PDF
+    List[Word]:
+        The list of Word objects in the PDF
     """
     with pdfplumber.open(pdf_path) as pdf:
 
@@ -202,35 +244,53 @@ def get_pdf_words(
         return words
 
 
-def to_snake_case(d: dict, replace: List[str] = ["."]) -> dict:
-    """Format the keys of the input dictionary to be in snake case.
+def to_snake_case(
+    d: Dict[str, str], replace: List[str] = ["."]
+) -> Dict[str, str]:
+    """
+    Format the keys of the input dictionary to be in snake case.
 
+    Note
+    ----
     This converts keys from "Snake Case" to "snake_case".
+
+    Parameters
+    ----------
+    d: Dict[str, str]
+        Contains the keys to convert
+    replace: List[str]
+        A list of characters to replace with blanks
     """
 
-    def _format_key(key):
+    def _format_key(key: str) -> str:
         for c in replace:
             key = key.replace(c, "")
         return key.lower()
 
-    return {"_".join(_format_key(key).split()): value for key, value in d.items()}
+    return {
+        "_".join(_format_key(key).split()): value for key, value in d.items()
+    }
 
 
-def groupby(words: List[Word], key: str, sort: bool = False) -> Iterator:
+def groupby(
+    words: List[Word], key: str, sort: bool = False
+) -> Iterator[Tuple[float, Iterator[Word]]]:
     """Group words by the specified attribute, optionally sorting."""
     if sort:
         words = sorted(words, key=attrgetter(key))
     return itertools.groupby(words, attrgetter(key))
 
 
-def find_nearest(array: Iterable, value: float) -> int:
+def find_nearest(array: Iterable[float], value: float) -> int:
     """Return the index of nearest match."""
     a = np.asarray(array)
     idx = (np.abs(a - value)).argmin()
     return idx
 
 
-def group_into_lines(words: List[Word], tolerance: int = 10) -> Dict[float, List[Word]]:
+def group_into_lines(
+    words: List[Word], tolerance: int = 10
+) -> Dict[float, List[Word]]:
     """Group words into lines, with a specified tolerance."""
     tree = IntervalTree()
     for i in range(len(words)):
@@ -256,31 +316,14 @@ class DataclassSchema:
     """Base class to handled serializing and deserializing dataclasses."""
 
     @classmethod
-    def from_dict(cls: Type[T], data: dict) -> T:
-        """
-        Return a new class instance from a dictionary
-        representation.
-
-        Parameters
-        ----------
-        data :
-            The dictionary representation of the class.
-        """
+    def from_dict(cls: Type[T], data: Dict[str, Any]) -> T:
+        """Initialize from a data dictionary."""
         schema = desert.schema(cls)
         return schema.load(data)
 
     @classmethod
     def from_json(cls: Type[T], path_or_json: Union[str, Path]) -> T:
-        """
-        Return a new class instance from either a file path
-        or a valid JSON string.
-
-        Parameters
-        ----------
-        path_or_json :
-            Either the path of the file to load or a valid JSON string.
-        """
-
+        """Initialize from either a file path or a valid JSON string."""
         # Convert to Path() first to check
         _path = path_or_json
         if isinstance(_path, str):
@@ -299,22 +342,30 @@ class DataclassSchema:
 
         return cls.from_dict(d)
 
-    def to_dict(self) -> dict:
-        """Return a dictionary representation of the data."""
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a data dictionary representation of the data."""
         schema = desert.schema(self.__class__)
         return schema.dump(self)
 
-    def to_json(self, path: Optional[Union[str, Path]] = None) -> Optional[str]:
+    def to_json(
+        self, path: Optional[Union[str, Path]] = None
+    ) -> Optional[str]:
         """
-        Serialize the object to JSON, either returning a valid JSON
-        string or saving to the input file path.
+        Serialize the object to JSON.
+
+        This will return either a valid JSON string or save the
+        JSON string to the input file path.
 
         Parameters
         ----------
-        path :
-            the file path to save the JSON encoding to
-        """
+        path: Optional[Union[str, Path]]
+            The (optional) file path to save the JSON encoding to
 
+        Returns
+        -------
+        Optional[str]:
+            The JSON string representation of the object
+        """
         # Dump to a dictionary
         schema = desert.schema(self.__class__)
         d = schema.dump(self)
