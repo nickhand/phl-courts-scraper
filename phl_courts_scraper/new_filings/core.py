@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from sys import exit
 from typing import List
 
+import numpy as np
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
@@ -121,7 +122,7 @@ class NewFilingsScraper:
                     allowed_dates,
                 ),
                 ignore_index=True,
-            ).replace("None", "")
+            )
         except Exception as e:
             logger.exception(f"Error parsing data: {str(e)}")
             exit(1)
@@ -133,6 +134,9 @@ class NewFilingsScraper:
         # Strip extra characters from the data
         for col in data:
             data[col] = data[col].str.strip()
+
+        # Replace None with np.nan
+        data = data.replace({"None": np.nan, "": np.nan})
 
         # Sort
         data = data.sort_values(SORT_COLUMNS)
@@ -158,7 +162,8 @@ class NewFilingsScraper:
         # Check bail type
         if (
             not data["bail_type"]
-            .isin(["Monetary", "Unsecured", "ROR", ""])
+            .dropna()
+            .isin(["Monetary", "Unsecured", "ROR"])
             .all()
         ):
             logger.exception("Error parsing data: invalid bail types")
@@ -168,6 +173,11 @@ class NewFilingsScraper:
         out = convert_to_floats(
             data, usecols=["bail_amount", "outstanding_bail_amount"]
         )
+
+        # Store missing values as NaN
+        out = out.replace({np.nan: None})
+
+        # return out
 
         return NewCriminalFilings.from_dict(
             {"data": out.to_dict(orient="records")}

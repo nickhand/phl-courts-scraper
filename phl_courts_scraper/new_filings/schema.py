@@ -1,9 +1,10 @@
 """Schema for new criminal filing scraper."""
 
 from dataclasses import dataclass
-from typing import Iterator, List
+from typing import Iterator, List, Optional
 
 import desert
+import numpy as np
 import pandas as pd
 
 from ..utils import DataclassSchema, TimeField
@@ -40,19 +41,19 @@ class NewCriminalFiling(DataclassSchema):
     docket_number: str
     filing_date: str
     charge: str
-    represented: str
-    bail_status: str
-    bail_type: str
-    bail_amount: float
-    outstanding_bail_amount: float
     bail_date: str = desert.field(
         TimeField(format="%m/%d/%Y %H:%M:%S %p", allow_none=True)
     )  # type: ignore
+    represented: Optional[str] = None
+    bail_type: Optional[str] = None
+    outstanding_bail_amount: Optional[float] = None
+    bail_amount: Optional[float] = None
+    bail_status: Optional[str] = None
 
     def __repr__(self) -> str:
         """Return a string representation of the object."""
         cls = self.__class__.__name__
-        fields = ["docket_number", "filing_date", "party"]
+        fields = ["docket_number", "filing_date", "defendant_name"]
         s = []
         for f in fields:
             s.append(f"{f}='{getattr(self, f)}'")
@@ -92,4 +93,6 @@ class NewCriminalFilings(DataclassSchema):
 
     def to_pandas(self) -> pd.DataFrame:
         """Return a dataframe representation of the data."""
-        return pd.DataFrame([c.to_dict() for c in self])
+        return pd.DataFrame([c.to_dict() for c in self]).replace(
+            {None: np.nan, "": np.nan}
+        )
