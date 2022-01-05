@@ -67,7 +67,9 @@ def get_webdriver(
         service = Service(ChromeDriverManager().install())
         logger.info("Chrome service initialized")
         logger.info("options = {}".format(options))
-        driver = webdriver.Chrome(service=service, options=options)
+        driver = webdriver.Chrome(
+            ChromeDriverManager().install(), options=options
+        )
         logger.info("Chrome driver initialized")
 
     # Firefox
