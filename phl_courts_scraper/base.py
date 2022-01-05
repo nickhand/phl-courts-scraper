@@ -50,7 +50,6 @@ def get_webdriver(
         options = webdriver.ChromeOptions()
         options.add_argument("--no-sandbox")
         if not debug:
-            logger.info("Adding headless option")
             options.add_argument("--headless")
 
         # Set up the download directory for PDFs
@@ -65,12 +64,7 @@ def get_webdriver(
             options.add_experimental_option("prefs", profile)
 
         service = Service(ChromeDriverManager().install())
-        logger.info("Chrome service initialized")
-        logger.info("options = {}".format(options))
-        driver = webdriver.Chrome(
-            ChromeDriverManager().install(), options=options
-        )
-        logger.info("Chrome driver initialized")
+        driver = webdriver.Chrome(service=service, options=options)
 
     # Firefox
     elif browser == "firefox":

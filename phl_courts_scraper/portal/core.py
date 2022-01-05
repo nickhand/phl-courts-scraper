@@ -62,15 +62,12 @@ class UJSPortalScraper:
         assert self.search_by in ["Incident Number", "Docket Number"]
 
         # Get the driver
-        logger.info("Initializing web driver")
         self.driver = get_webdriver(self.browser, debug=self.debug)
 
         # Navigate to the portal URL
-        logger.info("Getting portal URL")
         self.driver.get(PORTAL_URL)
 
         # select the search by dropdown element
-        logger.info("Selecting search by dropdown")
         SEARCH_BY_DROPDOWN = "SearchBy-Control"
         input_searchtype = Select(
             self.driver.find_element(
@@ -79,7 +76,6 @@ class UJSPortalScraper:
         )
 
         # Set the search by field
-        logger.info("Setting search by field")
         input_searchtype.select_by_visible_text(self.search_by)
 
     def scrape_portal_data(
