@@ -60,49 +60,27 @@ class NewFilingsScraper:
         # Loop over each row
         for row in soup.select(".panel-body .row"):
 
-            # Save the result for this row
             result = {}
 
             # Loop over each column in the row
             for col in row.select(".col-md-4 p"):
 
-                # Extract keys/values in this column
-                keys = []
-                values = []
-                for x in col:
-                    s = str(x).strip()
+                # Get the keys
+                keys = [x.text for x in col.select("strong")]
 
-                    # Keys are in bold
-                    if "<strong>" in s:
-                        keys.append(x.text.strip(":"))
-                    # Skip any line breaks
-                    elif "<br/>" in s:
-                        continue
-                    else:
-                        # If we have text, its the value
-                        if s:
-                            if hasattr(x, "text"):
-                                s = x.text
-                            values.append(s.strip())
-                        else:
+                # Split into all fields
+                fields = col.get_text(strip=True, separator="\n").splitlines()
 
-                            # Bail type is allowed to be empty
-                            # If so, add an empty value
-                            if (
-                                keys[-1] == "Bail Type"
-                                and len(values) == len(keys) - 1
-                            ):
-                                values.append("")
+                for key in keys:
 
-                # Update the result dict for this row
-                result.update(dict(zip(keys, values)))
-
-            clean_result = {}
-            for k, v in result.items():
-                clean_result[k] = v.strip()
+                    i = fields.index(key)
+                    value = fields[i + 1]
+                    if value in keys:
+                        value = ""
+                    result[key.strip(":")] = value
 
             # Save row results
-            data.append(clean_result)
+            data.append(result)
 
         # Return a dataframe
         return pd.DataFrame(data)
@@ -156,6 +134,7 @@ class NewFilingsScraper:
                 "Bail Date": "bail_date",
                 "Bail Type": "bail_type",
                 "Outstanding Bail Amt": "outstanding_bail_amount",
+                "In Custody": "in_custody",
             }
         )
 

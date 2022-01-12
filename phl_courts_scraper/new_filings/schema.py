@@ -49,6 +49,7 @@ class NewCriminalFiling(DataclassSchema):
     outstanding_bail_amount: Optional[float] = None
     bail_amount: Optional[float] = None
     bail_status: Optional[str] = None
+    in_custody: Optional[str] = None
 
     def __repr__(self) -> str:
         """Return a string representation of the object."""
