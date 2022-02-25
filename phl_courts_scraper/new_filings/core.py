@@ -139,12 +139,12 @@ class NewFilingsScraper:
         )
 
         # Check bail type
-        if (
-            not data["bail_type"]
-            .dropna()
-            .isin(["Monetary", "Unsecured", "ROR"])
-            .all()
-        ):
+        bail_types = (
+            data["bail_type"].dropna().isin(["Monetary", "Unsecured", "ROR"])
+        )
+
+        if not bail_types.all():
+            logger.info(data.loc[~bail_types])
             logger.exception("Error parsing data: invalid bail types")
             exit(1)
 
