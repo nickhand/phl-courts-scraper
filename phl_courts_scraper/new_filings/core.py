@@ -27,6 +27,8 @@ class NewFilingsScraper:
     See https://www.courts.phila.gov/NewCriminalFilings/date/default.aspx
     """
 
+    debug: bool = False
+
     def _get_all_dates(self) -> List[str]:
         """Extract the dates from the dropdown."""
         # Parse
@@ -74,9 +76,11 @@ class NewFilingsScraper:
                 for key in keys:
 
                     i = fields.index(key)
-                    value = fields[i + 1]
-                    if value in keys:
+
+                    if i + 1 == len(fields) or fields[i + 1] in keys:
                         value = ""
+                    else:
+                        value = fields[i + 1]
                     result[key.strip(":")] = value
 
             # Save row results
@@ -92,15 +96,18 @@ class NewFilingsScraper:
 
         # Get data from all pages for all dates
         try:
-            data = pd.concat(
-                map(
-                    lambda date: pd.concat(
-                        map(self._parse_single_page, self._get_all_pages(date))
-                    ),
-                    allowed_dates,
-                ),
-                ignore_index=True,
-            )
+            single_results = []
+            for date in allowed_dates:
+                for page in self._get_all_pages(date):
+
+                    if self.debug:
+                        logger.debug(f"Date = {date}, Page = {page}")
+                    single_results.append(
+                        self._parse_single_page(page).assign(page=page)
+                    )
+
+            # Combine all data
+            data = pd.concat(single_results, ignore_index=True)
         except Exception as e:
             logger.exception(f"Error parsing data: {str(e)}")
             exit(1)
@@ -140,11 +147,17 @@ class NewFilingsScraper:
 
         # Check bail type
         bail_types = (
-            data["bail_type"].dropna().isin(["Monetary", "Unsecured", "ROR"])
+            data["bail_type"]
+            .dropna()
+            .isin(["Monetary", "Unsecured", "ROR", "Nonmonetary"])
         )
 
         if not bail_types.all():
-            logger.info(data.loc[~bail_types])
+            bad = data.dropna(subset=["bail_type"]).loc[
+                ~bail_types, ["bail_type", "page", "defendant_name"]
+            ]
+            print(bad["page"].squeeze())
+            print(bad["defendant_name"].squeeze())
             logger.exception("Error parsing data: invalid bail types")
             exit(1)
 
@@ -154,7 +167,7 @@ class NewFilingsScraper:
         )
 
         # Store missing values as NaN
-        out = out.replace({np.nan: None})
+        out = out.replace({np.nan: None}).drop(columns=["page"])
 
         # return out
 
