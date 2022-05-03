@@ -36,7 +36,6 @@ class NewCriminalFiling(DataclassSchema):
     """
 
     defendant_name: str
-    age: str
     address: str
     docket_number: str
     filing_date: str
@@ -44,6 +43,7 @@ class NewCriminalFiling(DataclassSchema):
     bail_date: str = desert.field(
         TimeField(format="%m/%d/%Y %H:%M:%S %p", allow_none=True)
     )  # type: ignore
+    age: Optional[str] = None
     represented: Optional[str] = None
     bail_type: Optional[str] = None
     outstanding_bail_amount: Optional[float] = None
