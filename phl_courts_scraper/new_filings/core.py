@@ -13,7 +13,7 @@ from loguru import logger
 from ..utils import convert_to_floats
 from .schema import NewCriminalFilings
 
-URL = "http://www.courts.phila.gov/NewCriminalFilings/date/default.aspx"
+URL = "https://www.courts.phila.gov/NewCriminalFilings/date/default.aspx"
 SORT_COLUMNS = ["Filing Date", "Docket Number", "Defendant Name"]
 
 
