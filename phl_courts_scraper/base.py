@@ -12,8 +12,6 @@ from loguru import logger
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from tryagain import retries
-from webdriver_manager.chrome import ChromeDriverManager
-from webdriver_manager.firefox import GeckoDriverManager
 
 from .utils import DataclassSchema, downloaded_pdf
 
@@ -45,7 +43,6 @@ def get_webdriver(
     """
     # Google chrome
     if browser == "chrome":
-
         # Create the options
         options = webdriver.ChromeOptions()
         options.add_argument("--no-sandbox")
@@ -65,18 +62,17 @@ def get_webdriver(
             }
             options.add_experimental_option("prefs", profile)
 
-        service = Service(ChromeDriverManager().install())
+        service = Service()
         driver = webdriver.Chrome(service=service, options=options)
 
     # Firefox
     elif browser == "firefox":
-
         # Create the options
         options = webdriver.FirefoxOptions()
         if not debug:
             options.add_argument("--headless")
 
-        service = Service(GeckoDriverManager().install())
+        service = Service()
         driver = webdriver.Firefox(service=service, options=options)
     else:
         raise ValueError(
@@ -150,7 +146,6 @@ class DownloadedPDFScraper(abc.ABC):
             If the PDF download fails
         """
         with tempfile.TemporaryDirectory() as tmpdir:
-
             # Initialize if we need to
             if not hasattr(self, "driver"):
                 self._init(tmpdir)
@@ -172,7 +167,7 @@ class DownloadedPDFScraper(abc.ABC):
                 cleanup_hook=cleanup,
                 pre_retry_hook=lambda: self._init(tmpdir),
                 wait=lambda n: min(
-                    self.min_sleep + 2 ** n + random.random(), self.max_sleep
+                    self.min_sleep + 2**n + random.random(), self.max_sleep
                 ),
             )
             def call(i: int) -> None:
@@ -193,7 +188,6 @@ class DownloadedPDFScraper(abc.ABC):
                     interval=interval,
                     time_limit=time_limit,
                 ) as pdf_path:
-
                     # Parse the report
                     report = self(pdf_path)
 
